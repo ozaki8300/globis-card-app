@@ -21,7 +21,15 @@ type SharePayload = {
   starredCardIds?: string[];
 };
 
+type DraftPayload = {
+  markdown: string;
+  memo: string;
+  starredCardIds: string[];
+  updatedAt: string;
+};
+
 const MAX_SHARE_URL_LENGTH = 3000;
+const DRAFT_STORAGE_KEY = "thoughtdeck:draft:v1";
 
 const defaultMarkdown = `# タイトルを入力（例：マーケティング Day1 Hubble）
 
@@ -87,6 +95,14 @@ function extractTitle(markdown: string) {
   }
 
   return title;
+}
+
+function safeFileName(title: string) {
+  const base = title === "タイトル未設定" ? "thoughtdeck" : title;
+  return base
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "_")
+    .slice(0, 60);
 }
 
 function parseCards(markdown: string): Card[] {
@@ -264,6 +280,7 @@ function WritingGuide() {
 
 export default function Home() {
   const markdownRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasLoadedDraftRef = useRef(false);
 
   const [markdown, setMarkdown] = useState(defaultMarkdown);
   const [memo, setMemo] = useState("");
@@ -283,6 +300,9 @@ export default function Home() {
   const [shareUrl, setShareUrl] = useState("");
   const [shareError, setShareError] = useState("");
   const [showShare, setShowShare] = useState(false);
+
+  const [saveStatus, setSaveStatus] = useState("自動保存されています");
+  const [draftNotice, setDraftNotice] = useState("");
 
   const cards = useMemo(() => parseCards(markdown), [markdown]);
   const boardTitle = useMemo(() => extractTitle(markdown), [markdown]);
@@ -336,17 +356,54 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const data = params.get("d");
 
-    if (!data) return;
+    if (data) {
+      const payload = decodePayload(data);
+      if (payload) {
+        setMarkdown(payload.markdown ?? defaultMarkdown);
+        setMemo(payload.memo ?? "");
+        setStarredCardIds(payload.starredCardIds ?? []);
+        setShowInput(false);
+        setShowMemo(true);
+        hasLoadedDraftRef.current = true;
+        return;
+      }
+    }
 
-    const payload = decodePayload(data);
-    if (!payload) return;
+    const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved) as DraftPayload;
+        setMarkdown(draft.markdown ?? defaultMarkdown);
+        setMemo(draft.memo ?? "");
+        setStarredCardIds(draft.starredCardIds ?? []);
+        setDraftNotice("前回の一次保存を復元しました");
+      } catch {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    }
 
-    setMarkdown(payload.markdown ?? defaultMarkdown);
-    setMemo(payload.memo ?? "");
-    setStarredCardIds(payload.starredCardIds ?? []);
-    setShowInput(false);
-    setShowMemo(true);
+    hasLoadedDraftRef.current = true;
   }, []);
+
+  useEffect(() => {
+    if (!hasLoadedDraftRef.current) return;
+
+    setSaveStatus("保存中...");
+
+    const timer = window.setTimeout(() => {
+      const draft: DraftPayload = {
+        markdown,
+        memo,
+        starredCardIds,
+        updatedAt: new Date().toISOString(),
+      };
+
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      setSaveStatus("自動保存されています（閉じても復元できます）");
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [markdown, memo, starredCardIds]);
 
   useEffect(() => {
     const validIds = new Set(cards.map((card) => card.id));
@@ -453,6 +510,55 @@ export default function Home() {
     setSelectedCardId(null);
   };
 
+  const clearDraftStorage = () => {
+    const ok = window.confirm(
+      "一次保存を削除しますか？\nブラウザに自動保存された内容が削除されます。"
+    );
+
+    if (!ok) return;
+
+    setMarkdown(defaultMarkdown);
+    setMemo("");
+    setStarredCardIds([]);
+    setSelectedCardId(null);
+    setDraftNotice("");
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setSaveStatus("一次保存を削除しました");
+  };
+
+  const downloadMarkdown = () => {
+    const title = boardTitle;
+    const now = new Date();
+    const dateLabel = now.toISOString().slice(0, 10);
+    const fileName = `${dateLabel}_${safeFileName(title)}.md`;
+
+    const content = [
+      markdown.trimEnd(),
+      "",
+      "---",
+      "",
+      "## 授業メモ",
+      "",
+      memo.trim() ? memo.trimEnd() : "（授業メモなし）",
+      "",
+      "---",
+      "",
+      `保存日時: ${now.toLocaleString("ja-JP")}`,
+      `作成元: ThoughtDeck`,
+      "",
+    ].join("\n");
+
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+
+    URL.revokeObjectURL(url);
+  };
+
   const renderColumn = (cards: Card[]) => (
     <section className="space-y-6">
       {cards.map((card) => (
@@ -485,6 +591,13 @@ export default function Home() {
 
         <div className="flex flex-wrap gap-3">
           <button
+            onClick={downloadMarkdown}
+            className="whitespace-nowrap rounded-lg border border-neutral-600 px-4 py-2 text-sm text-neutral-100 transition hover:border-orange-400 hover:text-orange-300"
+          >
+            MD保存
+          </button>
+
+          <button
             onClick={toggleShare}
             className={[
               "whitespace-nowrap rounded-lg border px-4 py-2 text-sm transition",
@@ -515,6 +628,16 @@ export default function Home() {
           )}
         </div>
       </header>
+
+      <div className="border-b border-neutral-800 bg-neutral-950/80 px-4 py-2 text-xs text-neutral-400 md:px-6">
+        <span className="text-green-400">✔</span> {saveStatus}
+        {draftNotice && (
+          <span className="ml-3 text-blue-300">・{draftNotice}</span>
+        )}
+        <span className="ml-3 text-neutral-500">
+          ※ブラウザ内の一次保存です。自分のPCに残す場合は「MD保存」を使ってください。
+        </span>
+      </div>
 
       {shareError && (
         <div className="border-b border-red-900 bg-red-950/40 px-6 py-3 text-sm text-red-300">
@@ -586,14 +709,14 @@ export default function Home() {
 
       <div
         className={[
-          "flex min-h-[calc(100vh-96px)] flex-col md:min-h-[calc(100vh-73px)] md:flex-row",
+          "flex min-h-[calc(100vh-128px)] flex-col md:flex-row",
           resizeTarget ? "select-none" : "",
         ].join(" ")}
       >
         {showInput && (
           <>
             <aside
-              className="w-full shrink-0 border-b border-neutral-800 p-4 md:w-[var(--input-width)] md:border-b-0 md:border-r md:p-5"
+              className="flex w-full shrink-0 flex-col border-b border-neutral-800 p-4 md:w-[var(--input-width)] md:border-b-0 md:border-r md:p-5"
               style={
                 {
                   "--input-width": `${inputWidth}px`,
@@ -645,11 +768,23 @@ export default function Home() {
                 value={markdown}
                 onChange={(event) => setMarkdown(event.target.value)}
                 placeholder="# タイトルを入力"
-                className="h-72 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-360px)]"
+                className="h-72 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-430px)]"
               />
 
               <div className="mt-4">
                 <WritingGuide />
+              </div>
+
+              <div className="mt-auto pt-4 text-left">
+                <button
+                  onClick={clearDraftStorage}
+                  className="rounded border border-red-900/60 px-2 py-1 text-xs text-red-400 transition hover:bg-red-950/40 hover:text-red-300"
+                >
+                  一次保存削除
+                </button>
+                <p className="mt-1 text-[11px] leading-4 text-red-500/70">
+                  自動保存された内容を削除します
+                </p>
               </div>
             </aside>
 
@@ -722,7 +857,7 @@ export default function Home() {
                 value={memo}
                 onChange={(event) => setMemo(event.target.value)}
                 placeholder="ここに授業中の気づき・発言メモを書く..."
-                className="h-64 w-full resize-none rounded-xl border border-orange-700/70 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 md:h-[calc(100vh-175px)]"
+                className="h-64 w-full resize-none rounded-xl border border-orange-700/70 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 md:h-[calc(100vh-205px)]"
               />
 
               <p className="mt-2 text-right text-xs text-neutral-500">
