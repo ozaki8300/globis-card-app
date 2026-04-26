@@ -23,7 +23,7 @@ type SharePayload = {
 
 const MAX_SHARE_URL_LENGTH = 3000;
 
-const defaultMarkdown = `# タイトルを入力
+const defaultMarkdown = `# タイトルを入力（例：マーケティング Day1 Hubble）
 
 `;
 
@@ -82,7 +82,7 @@ function extractTitle(markdown: string) {
 
   const title = titleLine?.replace(/^#\s+/, "").trim();
 
-  if (!title || title === "タイトルを入力") {
+  if (!title || title === "タイトルを入力（例：マーケティング Day1 Hubble）") {
     return "タイトル未設定";
   }
 
@@ -166,9 +166,7 @@ function CardView({
       className={[
         "relative w-full cursor-pointer rounded-xl border p-5 pr-12 text-left transition",
         "bg-neutral-900 hover:bg-neutral-800/80",
-      selected
-        ? "border-blue-400 ring-1 ring-blue-400"
-        : "border-neutral-600",
+        selected ? "border-blue-400 ring-1 ring-blue-400" : "border-neutral-600",
       ].join(" ")}
     >
       <button
@@ -435,6 +433,15 @@ export default function Home() {
     }
   };
 
+  const toggleShare = () => {
+    if (showShare) {
+      setShowShare(false);
+      return;
+    }
+
+    createShareUrl();
+  };
+
   const copyShareUrl = async () => {
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
@@ -468,18 +475,20 @@ export default function Home() {
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="flex flex-col gap-3 border-b border-neutral-800 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-100">Thought Board</h1>
-          <p className="text-sm text-neutral-400">
-            Markdownからカードを表示し、授業メモを書く
+          <h1 className="text-xl font-bold tracking-wide text-neutral-100">
+            ThoughtDeck
+          </h1>
+          <p className="text-sm tracking-wider text-neutral-400">
+            Think. Deck. Share.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={createShareUrl}
+            onClick={toggleShare}
             className="whitespace-nowrap rounded-lg border border-blue-500 px-4 py-2 text-sm text-blue-300 hover:bg-blue-500/10"
           >
-            共有URL / QR
+            {showShare ? "共有を閉じる" : "共有URL / QR"}
           </button>
 
           {!showInput && (
