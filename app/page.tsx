@@ -486,7 +486,12 @@ export default function Home() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={toggleShare}
-            className="whitespace-nowrap rounded-lg border border-blue-500 px-4 py-2 text-sm text-blue-300 hover:bg-blue-500/10"
+            className={[
+              "whitespace-nowrap rounded-lg border px-4 py-2 text-sm transition",
+              showShare
+                ? "border-blue-500 bg-blue-500/10 text-blue-300"
+                : "border-neutral-600 text-neutral-100 hover:border-blue-500 hover:text-blue-300",
+            ].join(" ")}
           >
             {showShare ? "共有を閉じる" : "共有URL / QR"}
           </button>
