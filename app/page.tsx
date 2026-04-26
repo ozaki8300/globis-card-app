@@ -18,6 +18,7 @@ type ResizeTarget = "input" | "memo" | null;
 type SharePayload = {
   markdown: string;
   memo: string;
+  starredCardIds?: string[];
 };
 
 const MAX_SHARE_URL_LENGTH = 3000;
@@ -26,7 +27,7 @@ const defaultMarkdown = `# タイトルを入力
 
 `;
 
-const cardTemplate = `### 見出し
+const cardTemplate = `### 気づき
 @area: center
 @type: memo
 
@@ -149,23 +150,45 @@ function highlight(text: string) {
 function CardView({
   card,
   selected,
+  starred,
   onClick,
+  onToggleStar,
 }: {
   card: Card;
   selected: boolean;
+  starred: boolean;
   onClick: () => void;
+  onToggleStar: () => void;
 }) {
   return (
-    <button
+    <div
       onClick={onClick}
       className={[
-        "w-full rounded-xl border p-5 text-left transition",
+        "relative w-full cursor-pointer rounded-xl border p-5 pr-12 text-left transition",
         "bg-neutral-900 hover:bg-neutral-800/80",
-        selected
-          ? "border-blue-400 ring-1 ring-blue-400"
-          : "border-neutral-600",
+      selected
+        ? "border-blue-400 ring-1 ring-blue-400"
+        : "border-neutral-600",
       ].join(" ")}
     >
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleStar();
+        }}
+        aria-label={starred ? "重要マークを外す" : "重要マークを付ける"}
+        title={starred ? "重要マークを外す" : "重要マークを付ける"}
+        className={[
+          "absolute right-4 top-4 text-2xl leading-none transition",
+          starred
+            ? "text-yellow-300 drop-shadow hover:text-yellow-200"
+            : "text-neutral-400 hover:text-yellow-300",
+        ].join(" ")}
+      >
+        {starred ? "★" : "☆"}
+      </button>
+
       <h3 className="mb-4 text-lg font-bold leading-snug text-blue-400">
         {card.title}
       </h3>
@@ -177,7 +200,7 @@ function CardView({
           </li>
         ))}
       </ul>
-    </button>
+    </div>
   );
 }
 
@@ -232,9 +255,9 @@ function WritingGuide() {
 
         <div className="grid grid-cols-[120px_1fr] gap-3">
           <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
-            - 箇条書き
+            ★
           </code>
-          <span>カード本文の箇条書きになります。</span>
+          <span>カード右上の星で重要カードをマークできます。</span>
         </div>
       </div>
     </details>
@@ -246,6 +269,8 @@ export default function Home() {
 
   const [markdown, setMarkdown] = useState(defaultMarkdown);
   const [memo, setMemo] = useState("");
+  const [starredCardIds, setStarredCardIds] = useState<string[]>([]);
+
   const [showInput, setShowInput] = useState(true);
   const [showMemo, setShowMemo] = useState(true);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -271,13 +296,26 @@ export default function Home() {
   const buildShareUrl = useCallback(() => {
     const baseUrl = `${window.location.origin}${window.location.pathname}`;
 
-    if (!markdown.trim() && !memo.trim()) {
+    if (!markdown.trim() && !memo.trim() && starredCardIds.length === 0) {
       return baseUrl;
     }
 
-    const encoded = encodePayload({ markdown, memo });
+    const encoded = encodePayload({
+      markdown,
+      memo,
+      starredCardIds,
+    });
+
     return `${baseUrl}?d=${encodeURIComponent(encoded)}`;
-  }, [markdown, memo]);
+  }, [markdown, memo, starredCardIds]);
+
+  const toggleStar = (cardId: string) => {
+    setStarredCardIds((prev) =>
+      prev.includes(cardId)
+        ? prev.filter((id) => id !== cardId)
+        : [...prev, cardId]
+    );
+  };
 
   const addTemplate = () => {
     setMarkdown((prev) => {
@@ -307,9 +345,15 @@ export default function Home() {
 
     setMarkdown(payload.markdown ?? defaultMarkdown);
     setMemo(payload.memo ?? "");
+    setStarredCardIds(payload.starredCardIds ?? []);
     setShowInput(false);
     setShowMemo(true);
   }, []);
+
+  useEffect(() => {
+    const validIds = new Set(cards.map((card) => card.id));
+    setStarredCardIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [cards]);
 
   useEffect(() => {
     if (!showShare) return;
@@ -325,7 +369,7 @@ export default function Home() {
 
     setShareError("");
     setShareUrl(url);
-  }, [markdown, memo, showShare, buildShareUrl]);
+  }, [markdown, memo, starredCardIds, showShare, buildShareUrl]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -396,6 +440,12 @@ export default function Home() {
     await navigator.clipboard.writeText(shareUrl);
   };
 
+  const clearMarkdown = () => {
+    setMarkdown(defaultMarkdown);
+    setStarredCardIds([]);
+    setSelectedCardId(null);
+  };
+
   const renderColumn = (cards: Card[]) => (
     <section className="space-y-6">
       {cards.map((card) => (
@@ -403,13 +453,16 @@ export default function Home() {
           key={card.id}
           card={card}
           selected={selectedCardId === card.id}
+          starred={starredCardIds.includes(card.id)}
           onClick={() => setSelectedCardId(card.id)}
+          onToggleStar={() => toggleStar(card.id)}
         />
       ))}
     </section>
   );
 
-  const currentShareDataLength = markdown.length + memo.length;
+  const currentShareDataLength =
+    markdown.length + memo.length + starredCardIds.join("").length;
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -472,7 +525,7 @@ export default function Home() {
             <div>
               <h2 className="mb-2 font-bold text-blue-400">共有URL</h2>
               <p className="mb-2 text-sm text-neutral-400">
-                このURLを開くと、現在のカードと授業メモが復元されます。
+                このURLを開くと、現在のカード・授業メモ・重要マークが復元されます。
               </p>
               <p className="mb-3 rounded-lg border border-yellow-700/60 bg-yellow-950/30 px-3 py-2 text-xs leading-5 text-yellow-200">
                 注意：共有URLには入力内容が含まれます。個人情報・社外秘情報・他人の発言は入力しないでください。
@@ -554,14 +607,18 @@ export default function Home() {
                   </button>
 
                   <button
-                    onClick={() => setMarkdown(demoMarkdown)}
+                    onClick={() => {
+                      setMarkdown(demoMarkdown);
+                      setStarredCardIds([]);
+                      setSelectedCardId(null);
+                    }}
                     className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
                   >
                     デモ
                   </button>
 
                   <button
-                    onClick={() => setMarkdown(defaultMarkdown)}
+                    onClick={clearMarkdown}
                     className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
                   >
                     クリア
