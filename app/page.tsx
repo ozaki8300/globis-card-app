@@ -1,7 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 
 type Area = "left" | "center" | "right";
 
@@ -14,15 +15,26 @@ type Card = {
 
 type ResizeTarget = "input" | "memo" | null;
 
-const usagePlaceholder = `### カード見出し
-@area: left
+type SharePayload = {
+  markdown: string;
+  memo: string;
+};
 
-- ファクトを書く
-- ==重要語句== は黄色マーカー
+const MAX_SHARE_URL_LENGTH = 3000;
 
-@area は left / center / right が使えます`;
+const defaultMarkdown = `# タイトルを入力
 
-const demoMarkdown = `### 市場・業界
+`;
+
+const cardTemplate = `### 見出し
+@area: center
+@type: memo
+
+`;
+
+const demoMarkdown = `# マーケティング Day1 Hubble
+
+### 市場・業界
 @area: left
 
 - 米国では==75%==が視力矯正を必要とする
@@ -42,25 +54,39 @@ const demoMarkdown = `### 市場・業界
 - 低価格・サブスク・オンライン直販
 - 従来の面倒な購買体験を変えた
 
-### ビジネスモデル
-@area: center
-
-- D2Cモデル
-- 中間コストを削減
-- オンライン販売に特化
-
-### 成果
+### 成果・課題
 @area: right
 
 - 創業5年で==売上10倍==
-- 顧客満足度が高い
-- ブランド認知が拡大
-
-### 課題・リスク
-@area: right
-
 - 品質・規制・CACが課題
 - 持続的な差別化が必要`;
+
+function encodePayload(payload: SharePayload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+function decodePayload(encoded: string): SharePayload | null {
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  } catch {
+    return null;
+  }
+}
+
+function extractTitle(markdown: string) {
+  const titleLine = markdown
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("# ") && !line.startsWith("## "));
+
+  const title = titleLine?.replace(/^#\s+/, "").trim();
+
+  if (!title || title === "タイトルを入力") {
+    return "タイトル未設定";
+  }
+
+  return title;
+}
 
 function parseCards(markdown: string): Card[] {
   const blocks = markdown.split(/\n(?=### )/);
@@ -85,7 +111,10 @@ function parseCards(markdown: string): Card[] {
           : "center";
 
       const bodyLines = lines.filter(
-        (line) => !line.startsWith("### ") && !line.startsWith("@area:")
+        (line) =>
+          !line.startsWith("# ") &&
+          !line.startsWith("### ") &&
+          !line.startsWith("@area:")
       );
 
       return {
@@ -165,25 +194,138 @@ function ResizeHandle({
   );
 }
 
+function WritingGuide() {
+  return (
+    <details className="mb-4 rounded-xl border border-neutral-700 bg-neutral-900/70 p-3 text-sm text-neutral-300">
+      <summary className="cursor-pointer select-none font-bold text-blue-300">
+        書き方ガイド
+      </summary>
+
+      <div className="mt-4 space-y-3 border-t border-neutral-700 pt-4 text-xs leading-6">
+        <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-neutral-800 pb-2">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            # タイトル
+          </code>
+          <span>メモ全体のタイトル。1つだけ書きます。</span>
+        </div>
+
+        <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-neutral-800 pb-2">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            ### 見出し
+          </code>
+          <span>カードの見出しになります。</span>
+        </div>
+
+        <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-neutral-800 pb-2">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            @area:
+          </code>
+          <span>left / center / right で配置を指定します。</span>
+        </div>
+
+        <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-neutral-800 pb-2">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            ==強調==
+          </code>
+          <span>重要語句を黄色でハイライトします。</span>
+        </div>
+
+        <div className="grid grid-cols-[120px_1fr] gap-3">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            - 箇条書き
+          </code>
+          <span>カード本文の箇条書きになります。</span>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export default function Home() {
-  const [markdown, setMarkdown] = useState("");
+  const markdownRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const [markdown, setMarkdown] = useState(defaultMarkdown);
   const [memo, setMemo] = useState("");
   const [showInput, setShowInput] = useState(true);
   const [showMemo, setShowMemo] = useState(true);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
-  const [inputWidth, setInputWidth] = useState(320);
+  const [inputWidth, setInputWidth] = useState(360);
   const [memoWidth, setMemoWidth] = useState(340);
 
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
   const [resizeStartX, setResizeStartX] = useState(0);
   const [resizeStartWidth, setResizeStartWidth] = useState(0);
 
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareError, setShareError] = useState("");
+  const [showShare, setShowShare] = useState(false);
+
   const cards = useMemo(() => parseCards(markdown), [markdown]);
+  const boardTitle = useMemo(() => extractTitle(markdown), [markdown]);
 
   const leftCards = cards.filter((card) => card.area === "left");
   const centerCards = cards.filter((card) => card.area === "center");
   const rightCards = cards.filter((card) => card.area === "right");
+
+  const buildShareUrl = useCallback(() => {
+    const baseUrl = `${window.location.origin}${window.location.pathname}`;
+
+    if (!markdown.trim() && !memo.trim()) {
+      return baseUrl;
+    }
+
+    const encoded = encodePayload({ markdown, memo });
+    return `${baseUrl}?d=${encodeURIComponent(encoded)}`;
+  }, [markdown, memo]);
+
+  const addTemplate = () => {
+    setMarkdown((prev) => {
+      const trimmedRight = prev.replace(/\s+$/g, "");
+      const next = trimmedRight
+        ? `${trimmedRight}\n\n${cardTemplate}`
+        : cardTemplate;
+
+      setTimeout(() => {
+        markdownRef.current?.focus();
+        const length = next.length;
+        markdownRef.current?.setSelectionRange(length, length);
+      }, 0);
+
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const data = params.get("d");
+
+    if (!data) return;
+
+    const payload = decodePayload(data);
+    if (!payload) return;
+
+    setMarkdown(payload.markdown ?? defaultMarkdown);
+    setMemo(payload.memo ?? "");
+    setShowInput(false);
+    setShowMemo(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showShare) return;
+
+    const url = buildShareUrl();
+
+    if (url.length > MAX_SHARE_URL_LENGTH) {
+      setShareError(
+        `共有URLが長すぎます。現在 ${url.length} 文字です。${MAX_SHARE_URL_LENGTH} 文字以内にしてください。`
+      );
+      return;
+    }
+
+    setShareError("");
+    setShareUrl(url);
+  }, [markdown, memo, showShare, buildShareUrl]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -192,7 +334,7 @@ export default function Home() {
       const delta = event.clientX - resizeStartX;
 
       if (resizeTarget === "input") {
-        setInputWidth(Math.min(Math.max(resizeStartWidth + delta, 240), 560));
+        setInputWidth(Math.min(Math.max(resizeStartWidth + delta, 300), 620));
       }
 
       if (resizeTarget === "memo") {
@@ -225,6 +367,35 @@ export default function Home() {
     setResizeStartWidth(memoWidth);
   };
 
+  const createShareUrl = async () => {
+    setShareError("");
+
+    const url = buildShareUrl();
+
+    if (url.length > MAX_SHARE_URL_LENGTH) {
+      setShareUrl("");
+      setShowShare(false);
+      setShareError(
+        `共有URLが長すぎます。現在 ${url.length} 文字です。${MAX_SHARE_URL_LENGTH} 文字以内にしてください。`
+      );
+      return;
+    }
+
+    setShareUrl(url);
+    setShowShare(true);
+
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // コピー失敗時もURL表示はする
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+  };
+
   const renderColumn = (cards: Card[]) => (
     <section className="space-y-6">
       {cards.map((card) => (
@@ -238,6 +409,8 @@ export default function Home() {
     </section>
   );
 
+  const currentShareDataLength = markdown.length + memo.length;
+
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
       <header className="flex flex-col gap-3 border-b border-neutral-800 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
@@ -248,11 +421,18 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={createShareUrl}
+            className="whitespace-nowrap rounded-lg border border-blue-500 px-4 py-2 text-sm text-blue-300 hover:bg-blue-500/10"
+          >
+            共有URL / QR
+          </button>
+
           {!showInput && (
             <button
               onClick={() => setShowInput(true)}
-              className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-200 hover:border-blue-400 hover:text-blue-300"
+              className="whitespace-nowrap rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-200 hover:border-blue-400 hover:text-blue-300"
             >
               MD入力を開く
             </button>
@@ -261,13 +441,81 @@ export default function Home() {
           {!showMemo && (
             <button
               onClick={() => setShowMemo(true)}
-              className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-200 hover:border-blue-400 hover:text-blue-300"
+              className="whitespace-nowrap rounded-lg border border-orange-700 px-4 py-2 text-sm text-neutral-200 hover:border-orange-400 hover:text-orange-300"
             >
               メモを開く
             </button>
           )}
         </div>
       </header>
+
+      {shareError && (
+        <div className="border-b border-red-900 bg-red-950/40 px-6 py-3 text-sm text-red-300">
+          {shareError}
+        </div>
+      )}
+
+      {showShare && shareUrl && (
+        <div className="border-b border-neutral-800 bg-neutral-950 px-4 py-5 md:px-6">
+          <div className="grid gap-5 md:grid-cols-[200px_1fr]">
+            <div>
+              <p className="mb-2 text-center text-sm font-bold text-neutral-200 md:text-left">
+                {boardTitle}
+              </p>
+              <div className="flex justify-center md:justify-start">
+                <div className="inline-block rounded-xl bg-white p-2">
+                  <QRCodeSVG value={shareUrl} size={170} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="mb-2 font-bold text-blue-400">共有URL</h2>
+              <p className="mb-2 text-sm text-neutral-400">
+                このURLを開くと、現在のカードと授業メモが復元されます。
+              </p>
+              <p className="mb-3 rounded-lg border border-yellow-700/60 bg-yellow-950/30 px-3 py-2 text-xs leading-5 text-yellow-200">
+                注意：共有URLには入力内容が含まれます。個人情報・社外秘情報・他人の発言は入力しないでください。
+                このURLを知っている人は内容を閲覧できます。
+              </p>
+
+              <textarea
+                value={shareUrl}
+                readOnly
+                className="h-24 w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-xs leading-5 text-neutral-300"
+              />
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={createShareUrl}
+                  className="whitespace-nowrap rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-blue-400 hover:text-blue-300"
+                >
+                  更新
+                </button>
+
+                <button
+                  onClick={copyShareUrl}
+                  className="whitespace-nowrap rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-200 hover:border-blue-400 hover:text-blue-300"
+                >
+                  URLをコピー
+                </button>
+
+                <button
+                  onClick={() => setShowShare(false)}
+                  className="whitespace-nowrap rounded-lg border border-neutral-700 px-3 py-2 text-sm text-neutral-400 hover:border-neutral-500 hover:text-neutral-200"
+                >
+                  閉じる
+                </button>
+
+                <span className="text-xs text-neutral-500">
+                  入力データ量：{currentShareDataLength} 文字 / URL上限目安：
+                  {MAX_SHARE_URL_LENGTH} 文字
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         className={[
@@ -285,23 +533,9 @@ export default function Home() {
                 } as CSSProperties
               }
             >
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="font-bold text-blue-400">Markdown入力</h2>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setMarkdown(demoMarkdown)}
-                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  >
-                    デモ
-                  </button>
-
-                  <button
-                    onClick={() => setMarkdown("")}
-                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  >
-                    クリア
-                  </button>
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="font-bold text-blue-400">Markdown入力</h2>
 
                   <button
                     onClick={() => setShowInput(false)}
@@ -310,14 +544,42 @@ export default function Home() {
                     ×
                   </button>
                 </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={addTemplate}
+                    className="whitespace-nowrap rounded border border-blue-500/60 px-2.5 py-1 text-xs text-blue-300 hover:bg-blue-500/10"
+                  >
+                    ＋テンプレ
+                  </button>
+
+                  <button
+                    onClick={() => setMarkdown(demoMarkdown)}
+                    className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    デモ
+                  </button>
+
+                  <button
+                    onClick={() => setMarkdown(defaultMarkdown)}
+                    className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    クリア
+                  </button>
+                </div>
               </div>
 
               <textarea
+                ref={markdownRef}
                 value={markdown}
                 onChange={(event) => setMarkdown(event.target.value)}
-                placeholder={usagePlaceholder}
-                className="h-56 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-6 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-150px)]"
+                placeholder="# タイトルを入力"
+                className="h-72 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-360px)]"
               />
+
+              <div className="mt-4">
+                <WritingGuide />
+              </div>
             </aside>
 
             <ResizeHandle onMouseDown={startInputResize} />
@@ -325,14 +587,22 @@ export default function Home() {
         )}
 
         <section className="min-w-0 flex-1 overflow-auto p-4 md:p-8">
+          <div className="mb-6 rounded-xl border border-neutral-800 bg-neutral-900/60 px-5 py-4">
+            <p className="text-xs text-neutral-500">メモタイトル</p>
+            <h2 className="mt-1 text-xl font-bold text-neutral-100">
+              {boardTitle}
+            </h2>
+          </div>
+
           {cards.length === 0 ? (
             <div className="flex h-full min-h-64 items-center justify-center text-center text-neutral-500">
               <div>
                 <p className="mb-2 text-lg font-bold text-blue-400">
-                  Markdownを貼り付けるとカードが表示されます
+                  テンプレを追加するとカードが表示されます
                 </p>
                 <p className="text-sm">
-                  左の入力欄に、### 見出し / @area / ==マーカー== を使って書いてください。
+                  左の入力欄に、# タイトル / ### 見出し / @area /
+                  ==マーカー== を使って書いてください。
                 </p>
               </div>
             </div>
@@ -358,19 +628,19 @@ export default function Home() {
               }
             >
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="font-bold text-blue-400">授業メモ</h2>
+                <h2 className="font-bold text-orange-400">授業メモ</h2>
 
                 <div className="flex gap-2">
                   <button
                     onClick={() => setMemo("")}
-                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                    className="whitespace-nowrap rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-orange-300"
                   >
                     クリア
                   </button>
 
                   <button
                     onClick={() => setShowMemo(false)}
-                    className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                    className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-orange-300"
                   >
                     ×
                   </button>
@@ -381,7 +651,7 @@ export default function Home() {
                 value={memo}
                 onChange={(event) => setMemo(event.target.value)}
                 placeholder="ここに授業中の気づき・発言メモを書く..."
-                className="h-64 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-175px)]"
+                className="h-64 w-full resize-none rounded-xl border border-orange-700/70 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 md:h-[calc(100vh-175px)]"
               />
 
               <p className="mt-2 text-right text-xs text-neutral-500">
