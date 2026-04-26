@@ -35,12 +35,6 @@ const defaultMarkdown = `# タイトルを入力（例：マーケティング D
 
 `;
 
-const cardTemplate = `### 気づき
-@area: center
-@type: memo
-
-`;
-
 const demoMarkdown = `# マーケティング Day1 Hubble
 
 ### 市場・業界
@@ -69,6 +63,13 @@ const demoMarkdown = `# マーケティング Day1 Hubble
 - 創業5年で==売上10倍==
 - 品質・規制・CACが課題
 - 持続的な差別化が必要`;
+
+function makeTemplate(area: Area) {
+  return `### 見出し
+@area: ${area}
+- 
+`;
+}
 
 function encodePayload(payload: SharePayload) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
@@ -267,11 +268,20 @@ function WritingGuide() {
           <span>重要語句を黄色でハイライトします。</span>
         </div>
 
-        <div className="grid grid-cols-[120px_1fr] gap-3">
+        <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-neutral-800 pb-2">
           <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
             ★
           </code>
           <span>カード右上の星で重要カードをマークできます。</span>
+        </div>
+
+        <div className="grid grid-cols-[120px_1fr] gap-3">
+          <code className="rounded bg-neutral-800 px-2 py-1 text-blue-300">
+            保存
+          </code>
+          <span>
+            入力内容はブラウザ内に一次保存されます。自分のPCに残す場合はMD保存を使ってください。
+          </span>
         </div>
       </div>
     </details>
@@ -301,7 +311,7 @@ export default function Home() {
   const [shareError, setShareError] = useState("");
   const [showShare, setShowShare] = useState(false);
 
-  const [saveStatus, setSaveStatus] = useState("自動保存されています");
+  const [saveStatus, setSaveStatus] = useState("保存済");
   const [draftNotice, setDraftNotice] = useState("");
 
   const cards = useMemo(() => parseCards(markdown), [markdown]);
@@ -318,12 +328,7 @@ export default function Home() {
       return baseUrl;
     }
 
-    const encoded = encodePayload({
-      markdown,
-      memo,
-      starredCardIds,
-    });
-
+    const encoded = encodePayload({ markdown, memo, starredCardIds });
     return `${baseUrl}?d=${encodeURIComponent(encoded)}`;
   }, [markdown, memo, starredCardIds]);
 
@@ -335,12 +340,11 @@ export default function Home() {
     );
   };
 
-  const addTemplate = () => {
+  const addTemplate = (area: Area) => {
     setMarkdown((prev) => {
       const trimmedRight = prev.replace(/\s+$/g, "");
-      const next = trimmedRight
-        ? `${trimmedRight}\n\n${cardTemplate}`
-        : cardTemplate;
+      const template = makeTemplate(area);
+      const next = trimmedRight ? `${trimmedRight}\n\n${template}` : template;
 
       setTimeout(() => {
         markdownRef.current?.focus();
@@ -376,7 +380,7 @@ export default function Home() {
         setMarkdown(draft.markdown ?? defaultMarkdown);
         setMemo(draft.memo ?? "");
         setStarredCardIds(draft.starredCardIds ?? []);
-        setDraftNotice("前回の一次保存を復元しました");
+        setDraftNotice("ブラウザを閉じても復元します");
       } catch {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
       }
@@ -388,7 +392,7 @@ export default function Home() {
   useEffect(() => {
     if (!hasLoadedDraftRef.current) return;
 
-    setSaveStatus("保存中...");
+    setSaveStatus("保存中");
 
     const timer = window.setTimeout(() => {
       const draft: DraftPayload = {
@@ -399,7 +403,7 @@ export default function Home() {
       };
 
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
-      setSaveStatus("自動保存されています（閉じても復元できます）");
+      setSaveStatus("保存済");
     }, 300);
 
     return () => window.clearTimeout(timer);
@@ -441,9 +445,7 @@ export default function Home() {
       }
     };
 
-    const onMouseUp = () => {
-      setResizeTarget(null);
-    };
+    const onMouseUp = () => setResizeTarget(null);
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
@@ -523,7 +525,7 @@ export default function Home() {
     setSelectedCardId(null);
     setDraftNotice("");
     localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setSaveStatus("一次保存を削除しました");
+    setSaveStatus("保存済");
   };
 
   const downloadMarkdown = () => {
@@ -634,9 +636,6 @@ export default function Home() {
         {draftNotice && (
           <span className="ml-3 text-blue-300">・{draftNotice}</span>
         )}
-        <span className="ml-3 text-neutral-500">
-          ※ブラウザ内の一次保存です。自分のPCに残す場合は「MD保存」を使ってください。
-        </span>
       </div>
 
       {shareError && (
@@ -717,11 +716,7 @@ export default function Home() {
           <>
             <aside
               className="flex w-full shrink-0 flex-col border-b border-neutral-800 p-4 md:w-[var(--input-width)] md:border-b-0 md:border-r md:p-5"
-              style={
-                {
-                  "--input-width": `${inputWidth}px`,
-                } as CSSProperties
-              }
+              style={{ "--input-width": `${inputWidth}px` } as CSSProperties}
             >
               <div className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -735,29 +730,28 @@ export default function Home() {
                   </button>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={addTemplate}
-                    className="whitespace-nowrap rounded border border-blue-500/60 px-2.5 py-1 text-xs text-blue-300 hover:bg-blue-500/10"
-                  >
-                    ＋テンプレ
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => addTemplate("left")} className="whitespace-nowrap rounded border border-blue-500/60 px-2.5 py-1 text-xs text-blue-300 hover:bg-blue-500/10">
+                    ＋左
                   </button>
 
-                  <button
-                    onClick={() => {
-                      setMarkdown(demoMarkdown);
-                      setStarredCardIds([]);
-                      setSelectedCardId(null);
-                    }}
-                    className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  >
+                  <button onClick={() => addTemplate("center")} className="whitespace-nowrap rounded border border-blue-500/60 px-2.5 py-1 text-xs text-blue-300 hover:bg-blue-500/10">
+                    ＋中央
+                  </button>
+
+                  <button onClick={() => addTemplate("right")} className="whitespace-nowrap rounded border border-blue-500/60 px-2.5 py-1 text-xs text-blue-300 hover:bg-blue-500/10">
+                    ＋右
+                  </button>
+
+                  <button onClick={() => {
+                    setMarkdown(demoMarkdown);
+                    setStarredCardIds([]);
+                    setSelectedCardId(null);
+                  }} className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300">
                     デモ
                   </button>
 
-                  <button
-                    onClick={clearMarkdown}
-                    className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  >
+                  <button onClick={clearMarkdown} className="whitespace-nowrap rounded px-2.5 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300">
                     クリア
                   </button>
                 </div>
@@ -768,7 +762,7 @@ export default function Home() {
                 value={markdown}
                 onChange={(event) => setMarkdown(event.target.value)}
                 placeholder="# タイトルを入力"
-                className="h-72 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-430px)]"
+                className="h-72 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-330px)]"
               />
 
               <div className="mt-4">
@@ -827,11 +821,7 @@ export default function Home() {
 
             <aside
               className="w-full shrink-0 border-t border-neutral-800 p-4 md:w-[var(--memo-width)] md:border-l md:border-t-0 md:p-5"
-              style={
-                {
-                  "--memo-width": `${memoWidth}px`,
-                } as CSSProperties
-              }
+              style={{ "--memo-width": `${memoWidth}px` } as CSSProperties}
             >
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="font-bold text-orange-400">授業メモ</h2>
