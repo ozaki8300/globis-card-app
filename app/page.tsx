@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 
 type Area = "left" | "center" | "right";
@@ -13,47 +14,53 @@ type Card = {
 
 type ResizeTarget = "input" | "memo" | null;
 
-const sampleMarkdown = `
-### 市場・業界
+const usagePlaceholder = `### カード見出し
 @area: left
 
-米国では==75%==が視力矯正を必要とする。
-市場規模は==40億ドル==。
-寡占市場で、大手4社が強い。
+- ファクトを書く
+- ==重要語句== は黄色マーカー
+
+@area は left / center / right が使えます`;
+
+const demoMarkdown = `### 市場・業界
+@area: left
+
+- 米国では==75%==が視力矯正を必要とする
+- 市場規模は==40億ドル==
+- 大手4社が強い寡占市場
 
 ### 顧客
 @area: left
 
-初期顧客は平均28歳。
-女性比率は==70%==。
-SNS・モバイル経由が多い。
+- 初期顧客は平均28歳
+- 女性比率は==70%==
+- SNS・モバイル経由が多い
 
 ### 価値提案
 @area: center
 
-低価格・サブスク・オンライン直販。
-従来の面倒な購買体験を変えた。
+- 低価格・サブスク・オンライン直販
+- 従来の面倒な購買体験を変えた
 
 ### ビジネスモデル
 @area: center
 
-D2Cモデル。
-中間コストを削減。
-オンライン販売に特化。
+- D2Cモデル
+- 中間コストを削減
+- オンライン販売に特化
 
 ### 成果
 @area: right
 
-創業5年で==売上10倍==。
-顧客満足度が高い。
-ブランド認知が拡大。
+- 創業5年で==売上10倍==
+- 顧客満足度が高い
+- ブランド認知が拡大
 
 ### 課題・リスク
 @area: right
 
-品質・規制・CACが課題。
-ブランドの持続的な差別化が必要。
-`;
+- 品質・規制・CACが課題
+- 持続的な差別化が必要`;
 
 function parseCards(markdown: string): Card[] {
   const blocks = markdown.split(/\n(?=### )/);
@@ -153,13 +160,13 @@ function ResizeHandle({
   return (
     <div
       onMouseDown={onMouseDown}
-      className="w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400"
+      className="hidden w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400 md:block"
     />
   );
 }
 
 export default function Home() {
-  const [markdown, setMarkdown] = useState(sampleMarkdown);
+  const [markdown, setMarkdown] = useState("");
   const [memo, setMemo] = useState("");
   const [showInput, setShowInput] = useState(true);
   const [showMemo, setShowMemo] = useState(true);
@@ -233,11 +240,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
-      <header className="flex items-center justify-between border-b border-neutral-800 px-6 py-4">
+      <header className="flex flex-col gap-3 border-b border-neutral-800 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
         <div>
-          <h1 className="text-xl font-bold text-neutral-100">学習メモアプリ</h1>
+          <h1 className="text-xl font-bold text-neutral-100">Thought Board</h1>
           <p className="text-sm text-neutral-400">
-            Markdownからファクトカードを表示し、授業メモを書く
+            Markdownからカードを表示し、授業メモを書く
           </p>
         </div>
 
@@ -264,31 +271,52 @@ export default function Home() {
 
       <div
         className={[
-          "flex min-h-[calc(100vh-73px)]",
+          "flex min-h-[calc(100vh-96px)] flex-col md:min-h-[calc(100vh-73px)] md:flex-row",
           resizeTarget ? "select-none" : "",
         ].join(" ")}
       >
         {showInput && (
           <>
             <aside
-              className="shrink-0 border-r border-neutral-800 p-5"
-              style={{ width: inputWidth }}
+              className="w-full shrink-0 border-b border-neutral-800 p-4 md:w-[var(--input-width)] md:border-b-0 md:border-r md:p-5"
+              style={
+                {
+                  "--input-width": `${inputWidth}px`,
+                } as CSSProperties
+              }
             >
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="font-bold text-blue-400">Markdown入力</h2>
-                <button
-                  onClick={() => setShowInput(false)}
-                  className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  title="MD入力を閉じる"
-                >
-                  ×
-                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMarkdown(demoMarkdown)}
+                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    デモ
+                  </button>
+
+                  <button
+                    onClick={() => setMarkdown("")}
+                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    クリア
+                  </button>
+
+                  <button
+                    onClick={() => setShowInput(false)}
+                    className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               <textarea
                 value={markdown}
                 onChange={(event) => setMarkdown(event.target.value)}
-                className="h-[calc(100vh-150px)] w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-6 text-neutral-200 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                placeholder={usagePlaceholder}
+                className="h-56 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 font-mono text-sm leading-6 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-150px)]"
               />
             </aside>
 
@@ -296,12 +324,25 @@ export default function Home() {
           </>
         )}
 
-        <section className="min-w-0 flex-1 overflow-auto p-8">
-          <div className="grid grid-cols-3 gap-6">
-            {renderColumn(leftCards)}
-            {renderColumn(centerCards)}
-            {renderColumn(rightCards)}
-          </div>
+        <section className="min-w-0 flex-1 overflow-auto p-4 md:p-8">
+          {cards.length === 0 ? (
+            <div className="flex h-full min-h-64 items-center justify-center text-center text-neutral-500">
+              <div>
+                <p className="mb-2 text-lg font-bold text-blue-400">
+                  Markdownを貼り付けるとカードが表示されます
+                </p>
+                <p className="text-sm">
+                  左の入力欄に、### 見出し / @area / ==マーカー== を使って書いてください。
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              {renderColumn(leftCards)}
+              {renderColumn(centerCards)}
+              {renderColumn(rightCards)}
+            </div>
+          )}
         </section>
 
         {showMemo && (
@@ -309,25 +350,38 @@ export default function Home() {
             <ResizeHandle onMouseDown={startMemoResize} />
 
             <aside
-              className="shrink-0 border-l border-neutral-800 p-5"
-              style={{ width: memoWidth }}
+              className="w-full shrink-0 border-t border-neutral-800 p-4 md:w-[var(--memo-width)] md:border-l md:border-t-0 md:p-5"
+              style={
+                {
+                  "--memo-width": `${memoWidth}px`,
+                } as CSSProperties
+              }
             >
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="font-bold text-blue-400">授業メモ</h2>
-                <button
-                  onClick={() => setShowMemo(false)}
-                  className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
-                  title="メモを閉じる"
-                >
-                  ×
-                </button>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMemo("")}
+                    className="rounded px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    クリア
+                  </button>
+
+                  <button
+                    onClick={() => setShowMemo(false)}
+                    className="rounded px-2 py-1 text-neutral-400 hover:bg-neutral-800 hover:text-blue-300"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
 
               <textarea
                 value={memo}
                 onChange={(event) => setMemo(event.target.value)}
                 placeholder="ここに授業中の気づき・発言メモを書く..."
-                className="h-[calc(100vh-175px)] w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                className="h-64 w-full resize-none rounded-xl border border-neutral-600 bg-neutral-900 p-4 text-sm leading-7 text-neutral-200 placeholder:text-neutral-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 md:h-[calc(100vh-175px)]"
               />
 
               <p className="mt-2 text-right text-xs text-neutral-500">
