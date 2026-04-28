@@ -566,7 +566,7 @@ export default function Home() {
         </div>
       )}
 
-      <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible">
+      <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible max-lg:pb-44">
         {showLeft && (
           <>
             <aside className="no-scrollbar shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:w-full max-lg:border-b max-lg:border-r-0" style={{ width: `min(${leftWidth}px, 100%)` } as CSSProperties}>
@@ -651,7 +651,7 @@ export default function Home() {
             <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400 max-lg:hidden" />
             <aside className="no-scrollbar shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:w-full max-lg:border-l-0 max-lg:border-t" style={{ width: `min(${rightWidth}px, 100%)` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-blue-400">学びメモ</h2>
+                <h2 className="text-[13pt] font-bold text-blue-400">学びの殴り書き</h2>
                 <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
               </div>
               <textarea
@@ -667,7 +667,7 @@ export default function Home() {
         )}
       </div>
 
-      <footer className="border-t border-neutral-800 bg-neutral-950 p-3 lg:hidden">
+      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-neutral-800 bg-neutral-950/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.45)] backdrop-blur lg:hidden">
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={loadDemo} className={topButtonClass}>デモ</button>
