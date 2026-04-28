@@ -633,8 +633,6 @@ export default function Home() {
           <h1 className="text-[20px] font-bold leading-tight">
             <a
               href={THOUGHTDECK_HOME_URL}
-              target="_blank"
-              rel="noreferrer"
               className="text-neutral-100 no-underline transition-colors hover:text-blue-300"
             >
               ThoughtDeck
@@ -809,12 +807,7 @@ export default function Home() {
 
           <div className="text-[10pt] text-neutral-500">
             ThoughtDeck —{" "}
-            <a
-              href={THOUGHTDECK_HOME_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-neutral-300"
-            >
+            <a href={THOUGHTDECK_HOME_URL} className="underline underline-offset-2 hover:text-neutral-300">
               thought-deck.vercel.app
             </a>
           </div>
