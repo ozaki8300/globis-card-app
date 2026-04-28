@@ -313,6 +313,7 @@ export default function Home() {
   const [showQr, setShowQr] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [qrError, setQrError] = useState("");
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
 
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
@@ -437,6 +438,7 @@ export default function Home() {
     setShareUrl("");
     setQrError("");
     setShowQr(false);
+    setSelectedCardId(null);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -448,6 +450,7 @@ export default function Home() {
     setShareUrl("");
     setQrError("");
     setShowQr(false);
+    setSelectedCardId(null);
     setShowLeft(false);
   };
 
@@ -464,38 +467,66 @@ export default function Home() {
     setStarred((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const renderOneColumnSection = (section: OneColumnSection) => (
-    <section key={section.id} className="rounded-xl border border-blue-900 bg-blue-950/10 p-5">
-      <h3 className="mb-2 text-[13pt] font-bold text-blue-400">{section.title}</h3>
-      {section.lines.length > 0 ? (
-        <div className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
-          {section.lines.map((line, index) => (
-            <p key={index}>{renderInline(line)}</p>
-          ))}
+  const selectedCardClass = "bg-white/10 ring-1 ring-white/20";
+
+  const renderOneColumnSection = (section: OneColumnSection) => {
+    const isSelected = selectedCardId === section.id;
+
+    return (
+      <section
+        key={section.id}
+        onClick={() => setSelectedCardId(section.id)}
+        className={`cursor-pointer rounded-xl border bg-blue-950/10 p-5 transition ${
+          isSelected ? `${selectedCardClass} border-blue-800` : "border-blue-900 hover:bg-white/5"
+        }`}
+      >
+        <h3 className="mb-2 text-[13pt] font-bold text-blue-400">{section.title}</h3>
+        {section.lines.length > 0 ? (
+          <div className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
+            {section.lines.map((line, index) => (
+              <p key={index}>{renderInline(line)}</p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[11pt] text-neutral-500">本文はInput欄に入力してください。</p>
+        )}
+      </section>
+    );
+  };
+
+  const renderCard = (card: Card) => {
+    const isSelected = selectedCardId === card.id;
+
+    return (
+      <div
+        key={card.id}
+        onClick={() => setSelectedCardId(card.id)}
+        className={`cursor-pointer rounded-xl border bg-neutral-900 p-4 transition ${
+          isSelected ? `${selectedCardClass} border-neutral-500` : "border-neutral-700 hover:bg-white/5"
+        }`}
+      >
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h3 className="w-full text-[13pt] font-bold text-blue-400">{card.title}</h3>
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleStar(card.id);
+            }}
+            className="shrink-0 text-[11pt] text-neutral-400 hover:text-blue-300"
+            title="重要マーク"
+          >
+            {starred.includes(card.id) ? "★" : "☆"}
+          </button>
         </div>
-      ) : (
-        <p className="text-[11pt] text-neutral-500">本文はInput欄に入力してください。</p>
-      )}
-    </section>
-  );
 
-  const renderCard = (card: Card) => (
-    <div key={card.id} className="rounded-xl border border-neutral-700 bg-neutral-900 p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <h3 className="w-full text-[13pt] font-bold text-blue-400">{card.title}</h3>
-        <button onClick={() => toggleStar(card.id)} className="shrink-0 text-[11pt] text-neutral-400 hover:text-blue-300" title="重要マーク">
-          {starred.includes(card.id) ? "★" : "☆"}
-        </button>
+        <ul className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
+          {card.lines.map((line, index) => (
+            <li key={index}>{renderInline(line)}</li>
+          ))}
+        </ul>
       </div>
-
-      <ul className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
-        {card.lines.map((line, index) => (
-          <li key={index}>{renderInline(line)}</li>
-        ))}
-      </ul>
-    </div>
-  );
-
+    );
+  };
   const renderColumn = (items: Card[]) => <section className="space-y-4">{items.map(renderCard)}</section>;
 
   const topButtonClass = "rounded-lg border border-neutral-600 px-3 py-2 text-[11pt] hover:border-blue-400 hover:text-blue-300";
@@ -569,7 +600,7 @@ export default function Home() {
       <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible">
         {showLeft && (
           <>
-            <aside className="no-scrollbar shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:w-full max-lg:border-b max-lg:border-r-0" style={{ width: `min(${leftWidth}px, 100%)` } as CSSProperties}>
+            <aside className="no-scrollbar w-full shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]" style={{ "--left-width": `${leftWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="text-[13pt] font-bold text-blue-400">インプット</h2>
                 <div className="flex items-center gap-2">
@@ -649,9 +680,9 @@ export default function Home() {
         {showRight && (
           <>
             <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400 max-lg:hidden" />
-            <aside className="no-scrollbar shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:w-full max-lg:border-l-0 max-lg:border-t" style={{ width: `min(${rightWidth}px, 100%)` } as CSSProperties}>
+            <aside className="no-scrollbar w-full shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]" style={{ "--right-width": `${rightWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-blue-400">学びメモ</h2>
+                <h2 className="text-[13pt] font-bold text-blue-400">学びの殴り書き</h2>
                 <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
               </div>
               <textarea
@@ -669,17 +700,14 @@ export default function Home() {
 
       <footer className="border-t border-neutral-800 bg-neutral-950 p-3 lg:hidden">
         <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={loadDemo} className={topButtonClass}>デモ</button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>Input</button>
             <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>Memo</button>
           </div>
 
-          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
+          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
             <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
