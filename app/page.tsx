@@ -55,6 +55,14 @@ const blankRaw = `# タイトル
 
 ### 見出し
 @area: left
+-
+
+### 見出し
+@area: center
+- 
+
+### 見出し
+@area: right
 - 
 
 ## まとめ
@@ -91,7 +99,7 @@ const demoRaw = `# マーケティング Day1 Hubble
 - 持続的な差別化が必要
 
 ## まとめ
-Hubbleは低価格・利便性を武器に成長したが、今後は品質・規制・CACを管理しながら持続的な差別化を設計する必要がある。`;
+Hubbleは低価格・利便性を武器に成長したが、今後は品質・規制・CACを管理しながら持続的な差別化する必要がある。`;
 
 function encodeDeck(deck: DeckState) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(deck))));
@@ -454,6 +462,16 @@ export default function Home() {
     setShowLeft(false);
   };
 
+  const confirmLoadDemo = () => {
+    const ok = window.confirm(
+      "現在の入力内容・学びメモ・追加状態がデモ内容で上書きされます。よろしいですか？"
+    );
+
+    if (!ok) return;
+
+    loadDemo();
+  };
+
   const insertTemplate = (kind: "top" | Area | "bottom") => {
     setRaw((prev) => {
       if (kind === "top") return insertTopSectionTemplate(prev);
@@ -556,20 +574,7 @@ export default function Home() {
           {copyStatus && <span className="text-[11pt] text-blue-400">{copyStatus}</span>}
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
-            <button
-              onClick={() => {
-                const ok = window.confirm(
-                  "現在の入力内容・学びメモ・追加状態がデモ内容で上書きされます。よろしいですか？"
-                );
-
-                if (!ok) return;
-
-                loadDemo();
-              }}
-              className={topButtonClass}
-            >
-              デモ
-            </button>
+            <button onClick={confirmLoadDemo} className={topButtonClass}>デモ</button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
           </div>
 
@@ -713,14 +718,17 @@ export default function Home() {
 
       <footer className="border-t border-neutral-800 bg-neutral-950 p-3 lg:hidden">
         <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
-            <button onClick={loadDemo} className={topButtonClass}>デモ</button>
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
+            <button onClick={confirmLoadDemo} className={topButtonClass}>デモ</button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>Input</button>
             <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>Memo</button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
             <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
