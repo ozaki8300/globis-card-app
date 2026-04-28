@@ -556,7 +556,20 @@ export default function Home() {
           {copyStatus && <span className="text-[11pt] text-blue-400">{copyStatus}</span>}
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
-            <button onClick={loadDemo} className={topButtonClass}>デモ</button>
+            <button
+              onClick={() => {
+                const ok = window.confirm(
+                  "現在の入力内容・学びメモ・追加状態がデモ内容で上書きされます。よろしいですか？"
+                );
+
+                if (!ok) return;
+
+                loadDemo();
+              }}
+              className={topButtonClass}
+            >
+              デモ
+            </button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
           </div>
 
