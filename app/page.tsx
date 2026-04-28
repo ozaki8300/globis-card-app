@@ -118,6 +118,33 @@ function getTitle(raw: string) {
   return line?.replace(/^#[ \t\u3000]+/, "").trim() || "タイトル未設定";
 }
 
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function getTimestampSlug(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = pad2(date.getMonth() + 1);
+  const dd = pad2(date.getDate());
+  const hh = pad2(date.getHours());
+  const mi = pad2(date.getMinutes());
+  const ss = pad2(date.getSeconds());
+  return `${yyyy}-${mm}-${dd}_${hh}-${mi}-${ss}`;
+}
+
+function sanitizeFileName(value: string) {
+  return value
+    .replace(/[\/:*?"<>|#^[\]]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getObsidianTitle(title: string, timestamp: string) {
+  const safeTitle = sanitizeFileName(title);
+  if (!safeTitle || safeTitle === "タイトル" || safeTitle === "タイトル未設定") return timestamp;
+  return `${timestamp}_${safeTitle}`;
+}
+
 function isH1(line: string) {
   return /^#[ \t\u3000]+/.test(line.trimEnd()) && !/^##/.test(line.trimStart());
 }
@@ -318,6 +345,7 @@ export default function Home() {
 
   const [saveStatus, setSaveStatus] = useState("保存済");
   const [copyStatus, setCopyStatus] = useState("");
+  const [obsidianToast, setObsidianToast] = useState("");
   const [showQr, setShowQr] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [qrError, setQrError] = useState("");
@@ -435,6 +463,17 @@ export default function Home() {
     await navigator.clipboard.writeText(buildExportMarkdown(raw, addedCards, memo));
     setCopyStatus("MDコピー済");
     window.setTimeout(() => setCopyStatus(""), 1800);
+  };
+
+  const saveToObsidian = () => {
+    const md = buildExportMarkdown(raw, addedCards, memo);
+    const timestamp = getTimestampSlug();
+    const fileTitle = getObsidianTitle(title, timestamp);
+    const filePath = `ThoughtDeck/${fileTitle}`;
+    const url = `obsidian://new?file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(md)}&append=true`;
+    setObsidianToast(`Obsidianに保存しました：${fileTitle}`);
+    window.setTimeout(() => setObsidianToast(""), 2200);
+    window.location.href = url;
   };
 
   const clearAll = () => {
@@ -563,6 +602,12 @@ export default function Home() {
         }
       `}</style>
 
+      {obsidianToast && (
+        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-blue-700 bg-neutral-900 px-4 py-2 text-[11pt] text-blue-300 shadow-lg">
+          {obsidianToast}
+        </div>
+      )}
+
       <header className="flex min-h-[70px] flex-wrap items-center justify-between gap-3 border-b border-neutral-800 px-6 py-3">
         <div>
           <h1 className="text-xl font-bold">ThoughtDeck</h1>
@@ -586,6 +631,7 @@ export default function Home() {
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
+            <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
             <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
           </div>
         </div>
@@ -728,6 +774,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
+            <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
             <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
           </div>
         </div>
