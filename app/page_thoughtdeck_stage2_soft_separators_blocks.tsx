@@ -1118,7 +1118,7 @@ export default function Home() {
               event.stopPropagation();
               toggleStar(card.id);
             }}
-            className="shrink-0 text-[11pt] text-neutral-200 hover:text-neutral-200"
+            className="shrink-0 text-[11pt] text-neutral-500 hover:text-neutral-300"
             title="重要マーク"
           >
             {starred.includes(card.id) ? "★" : "☆"}

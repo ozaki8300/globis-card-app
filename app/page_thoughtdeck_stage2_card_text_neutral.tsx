@@ -467,7 +467,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={i} className="font-bold text-[#c7d2fe]">
+        <strong key={i} className="font-bold text-neutral-200">
           {part.slice(2, -2)}
         </strong>
       );
@@ -1072,7 +1072,7 @@ export default function Home() {
           isSelected ? selectedThoughtClass : baseCardClass
         }`}
       >
-        <h3 className="mb-1 text-[12pt] font-bold text-[#c7d2fe]">
+        <h3 className="mb-1 text-[12pt] font-bold text-neutral-200">
           {section.title}
         </h3>
         {section.lines.length > 0 ? (
@@ -1110,7 +1110,7 @@ export default function Home() {
         }`}
       >
         <div className="mb-2 flex items-start justify-between gap-3">
-          <h3 className="w-full text-[12pt] font-bold text-[#c7d2fe]">
+          <h3 className="w-full text-[12pt] font-bold text-neutral-200">
             {card.title}
           </h3>
           <button
@@ -1118,7 +1118,7 @@ export default function Home() {
               event.stopPropagation();
               toggleStar(card.id);
             }}
-            className="shrink-0 text-[11pt] text-neutral-200 hover:text-neutral-200"
+            className="shrink-0 text-[11pt] text-neutral-300 hover:text-white"
             title="重要マーク"
           >
             {starred.includes(card.id) ? "★" : "☆"}
@@ -1631,7 +1631,7 @@ export default function Home() {
                           : "border-neutral-700 bg-neutral-950/70 hover:border-blue-500/40 hover:bg-white/5"
                       }`}
                     >
-                      <h3 className="mb-2 text-[12pt] font-bold text-[#c7d2fe]">
+                      <h3 className="mb-2 text-[12pt] font-bold text-neutral-200">
                         {section.title}
                       </h3>
 

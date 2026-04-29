@@ -13,8 +13,6 @@ type ParsedCard = {
   lines: string[];
   source: "raw";
   visualGroup: number;
-  rawH3Index: number;
-  areaBlockIndex: number;
 };
 
 type AddedCard = {
@@ -218,9 +216,6 @@ function parseDeck(raw: string): ParsedDeck {
   let currentCard: ParsedCard | null = null;
   let hasSeenCard = false;
   let visualGroup = 0;
-  let h3Index = -1;
-  let areaBlockIndex = 0;
-  let currentCardTitle = "見出し";
 
   const flushSection = () => {
     if (!currentSection) return;
@@ -238,20 +233,6 @@ function parseDeck(raw: string): ParsedDeck {
     cards.push(currentCard);
     currentCard = null;
   };
-
-  const hasCardBody = (card: ParsedCard | null) =>
-    Boolean(card && card.lines.some((line) => line.trim().length > 0));
-
-  const createRawCard = (area: Area = "center"): ParsedCard => ({
-    id: `raw-${h3Index}-${areaBlockIndex}-${currentCardTitle}`,
-    source: "raw",
-    area,
-    title: currentCardTitle,
-    lines: [],
-    visualGroup,
-    rawH3Index: h3Index,
-    areaBlockIndex,
-  });
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -287,31 +268,21 @@ function parseDeck(raw: string): ParsedDeck {
       flushSection();
       flushCard();
       hasSeenCard = true;
-      h3Index += 1;
-      areaBlockIndex = 0;
-      currentCardTitle = trimmed.replace(/^###[ \t\u3000]*/, "").trim() || "見出し";
-      currentCard = createRawCard("center");
+      currentCard = {
+        id: `raw-${cards.length}-${trimmed}`,
+        source: "raw",
+        area: "center",
+        title: trimmed.replace(/^###[ \t\u3000]*/, "").trim() || "見出し",
+        lines: [],
+        visualGroup,
+      };
       continue;
     }
 
     if (currentCard) {
-      if (trimmed.startsWith("@area:")) {
-        const nextArea = areaFromLine(trimmed);
-
-        // 1つの「### 見出し」の中に @area が複数ある場合は、
-        // @area ごとにカードを分割する。
-        // これにより、見出しは同じまま left / center / right に自然に展開できる。
-        if (hasCardBody(currentCard)) {
-          flushCard();
-          areaBlockIndex += 1;
-          currentCard = createRawCard(nextArea);
-        } else {
-          currentCard.area = nextArea;
-        }
-        continue;
-      }
-
-      currentCard.lines.push(line);
+      if (trimmed.startsWith("@area:"))
+        currentCard.area = areaFromLine(trimmed);
+      else currentCard.lines.push(line);
       continue;
     }
 
@@ -361,27 +332,23 @@ function insertBottomSectionTemplate(raw: string) {
   return `${raw.trimEnd()}\n\n## まとめ\n- `;
 }
 
-function rawCardLocatorFromId(id: string) {
-  const match = id.match(/^raw-(\d+)-(\d+)-/);
-  if (!match) return null;
-  return {
-    h3Index: Number(match[1]),
-    areaBlockIndex: Number(match[2]),
-  };
+function rawCardIndexFromId(id: string) {
+  const match = id.match(/^raw-(\d+)-/);
+  return match ? Number(match[1]) : null;
 }
 
 function changeRawCardArea(raw: string, cardId: string, nextArea: Area) {
-  const locator = rawCardLocatorFromId(cardId);
-  if (!locator) return raw;
+  const targetIndex = rawCardIndexFromId(cardId);
+  if (targetIndex === null) return raw;
 
   const lines = raw.split("\n");
-  let currentH3Index = -1;
+  let cardIndex = -1;
   let h3LineIndex = -1;
 
   for (let i = 0; i < lines.length; i += 1) {
     if (isH3(lines[i])) {
-      currentH3Index += 1;
-      if (currentH3Index === locator.h3Index) {
+      cardIndex += 1;
+      if (cardIndex === targetIndex) {
         h3LineIndex = i;
         break;
       }
@@ -392,21 +359,21 @@ function changeRawCardArea(raw: string, cardId: string, nextArea: Area) {
 
   let blockEnd = lines.length;
   for (let i = h3LineIndex + 1; i < lines.length; i += 1) {
-    if (isH1(lines[i]) || isH2(lines[i]) || isH3(lines[i]) || lines[i].trim() === "---") {
+    if (isH1(lines[i]) || isH2(lines[i]) || isH3(lines[i])) {
       blockEnd = i;
       break;
     }
   }
 
-  const areaLineIndexes: number[] = [];
-  for (let i = h3LineIndex + 1; i < blockEnd; i += 1) {
-    if (lines[i].trim().startsWith("@area:")) areaLineIndexes.push(i);
-  }
+  const areaLineIndex = lines.findIndex(
+    (line, index) =>
+      index > h3LineIndex &&
+      index < blockEnd &&
+      line.trim().startsWith("@area:"),
+  );
 
-  const targetAreaLineIndex = areaLineIndexes[locator.areaBlockIndex];
-
-  if (targetAreaLineIndex !== undefined) {
-    lines[targetAreaLineIndex] = `@area: ${nextArea}`;
+  if (areaLineIndex >= 0) {
+    lines[areaLineIndex] = `@area: ${nextArea}`;
   } else {
     lines.splice(h3LineIndex + 1, 0, `@area: ${nextArea}`);
   }
@@ -467,7 +434,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={i} className="font-bold text-[#c7d2fe]">
+        <strong key={i} className="font-bold text-white">
           {part.slice(2, -2)}
         </strong>
       );
@@ -744,25 +711,9 @@ export default function Home() {
     ];
   }, [topSections, allCards, bottomSections]);
 
-  const cardBlocks = useMemo(() => {
-    const blockMap = new Map<number, Card[]>();
-
-    allCards.forEach((card) => {
-      const blockKey = card.visualGroup ?? 0;
-      const existing = blockMap.get(blockKey) ?? [];
-      existing.push(card);
-      blockMap.set(blockKey, existing);
-    });
-
-    return Array.from(blockMap.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([visualGroup, cards]) => ({
-        visualGroup,
-        left: cards.filter((card) => card.area === "left"),
-        center: cards.filter((card) => card.area === "center"),
-        right: cards.filter((card) => card.area === "right"),
-      }));
-  }, [allCards]);
+  const leftCards = allCards.filter((c) => c.area === "left");
+  const centerCards = allCards.filter((c) => c.area === "center");
+  const rightCards = allCards.filter((c) => c.area === "right");
   const selectedCard =
     allCards.find((card) => card.id === selectedCardId) || null;
   const selectedFocusItem =
@@ -1072,7 +1023,7 @@ export default function Home() {
           isSelected ? selectedThoughtClass : baseCardClass
         }`}
       >
-        <h3 className="mb-1 text-[12pt] font-bold text-[#c7d2fe]">
+        <h3 className="mb-1 text-[12pt] font-bold text-neutral-200">
           {section.title}
         </h3>
         {section.lines.length > 0 ? (
@@ -1106,11 +1057,13 @@ export default function Home() {
         className={`cursor-move rounded-xl border p-4 transition ${
           isSelected
             ? selectedThoughtClass
-            : baseCardClass
+            : isCenter
+              ? "border-neutral-600 bg-neutral-900 hover:border-blue-500/40 hover:bg-white/5"
+              : baseCardClass
         }`}
       >
         <div className="mb-2 flex items-start justify-between gap-3">
-          <h3 className="w-full text-[12pt] font-bold text-[#c7d2fe]">
+          <h3 className="w-full text-[12pt] font-bold text-neutral-100">
             {card.title}
           </h3>
           <button
@@ -1118,7 +1071,7 @@ export default function Home() {
               event.stopPropagation();
               toggleStar(card.id);
             }}
-            className="shrink-0 text-[11pt] text-neutral-200 hover:text-neutral-200"
+            className="shrink-0 text-[11pt] text-neutral-500 hover:text-neutral-300"
             title="重要マーク"
           >
             {starred.includes(card.id) ? "★" : "☆"}
@@ -1195,57 +1148,34 @@ export default function Home() {
           moveCardToArea(draggedCardId, area);
           setDraggedCardId(null);
         }}
-        className={`min-h-12 space-y-3 rounded-xl transition ${
-          draggedCardId ? "border border-dashed border-neutral-800 p-2" : ""
+        className={`min-h-16 space-y-3 rounded-xl transition ${
+          isCenter
+            ? "border border-neutral-800/70 p-2"
+            : draggedCardId
+              ? "border border-dashed border-neutral-800 p-2"
+              : ""
         }`}
       >
-        {items.map((card) => renderCard(card, isCenter))}
+        {items.map((card, index) => {
+          const prev = items[index - 1];
+          const hasSoftBreak =
+            index > 0 &&
+            card.visualGroup !== undefined &&
+            prev?.visualGroup !== undefined &&
+            card.visualGroup !== prev.visualGroup;
+
+          return (
+            <div key={card.id} className={hasSoftBreak ? "mt-7" : ""}>
+              {renderCard(card, isCenter)}
+            </div>
+          );
+        })}
         {draggedCardId && items.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-800 p-4 text-center text-[10.5pt] text-neutral-600">
             ここへ移動
           </div>
         )}
       </section>
-    );
-  };
-
-  const renderCardBlock = (
-    block: { visualGroup: number; left: Card[]; center: Card[]; right: Card[] },
-    index: number,
-  ) => {
-    const hasCards =
-      block.left.length > 0 || block.center.length > 0 || block.right.length > 0;
-
-    if (!hasCards) return null;
-
-    return (
-      <div
-        key={block.visualGroup}
-        className={index === 0 ? "" : "mt-8 border-t border-neutral-900 pt-7"}
-      >
-        <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
-          <div className="space-y-2">
-            {perspective.left && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.left}</p>
-            )}
-            {renderColumn(block.left, "left")}
-          </div>
-
-          <div className="space-y-2">
-            {perspective.center && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.center}</p>
-            )}
-            {renderColumn(block.center, "center")}
-          </div>
-
-          <div className="space-y-2">
-            {perspective.right && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.right}</p>
-            )}
-            {renderColumn(block.right, "right")}
-          </div>
-        </div>
-      </div>
     );
   };
 
@@ -1609,7 +1539,34 @@ export default function Home() {
           {focusMode && selectedFocusItem ? (
             renderFocusedCard(selectedFocusItem)
           ) : (
-            <div>{cardBlocks.map((block, index) => renderCardBlock(block, index))}</div>
+            <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+              <div className="space-y-2">
+                {perspective.left && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.left}
+                  </p>
+                )}
+                {renderColumn(leftCards, "left")}
+              </div>
+
+              <div className="space-y-2">
+                {perspective.center && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.center}
+                  </p>
+                )}
+                {renderColumn(centerCards, "center")}
+              </div>
+
+              <div className="space-y-2">
+                {perspective.right && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.right}
+                  </p>
+                )}
+                {renderColumn(rightCards, "right")}
+              </div>
+            </div>
           )}
 
           {bottomSections.length > 0 && !focusMode && (
@@ -1631,7 +1588,7 @@ export default function Home() {
                           : "border-neutral-700 bg-neutral-950/70 hover:border-blue-500/40 hover:bg-white/5"
                       }`}
                     >
-                      <h3 className="mb-2 text-[12pt] font-bold text-[#c7d2fe]">
+                      <h3 className="mb-2 text-[12pt] font-bold text-neutral-100">
                         {section.title}
                       </h3>
 

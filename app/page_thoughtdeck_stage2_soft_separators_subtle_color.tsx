@@ -744,25 +744,9 @@ export default function Home() {
     ];
   }, [topSections, allCards, bottomSections]);
 
-  const cardBlocks = useMemo(() => {
-    const blockMap = new Map<number, Card[]>();
-
-    allCards.forEach((card) => {
-      const blockKey = card.visualGroup ?? 0;
-      const existing = blockMap.get(blockKey) ?? [];
-      existing.push(card);
-      blockMap.set(blockKey, existing);
-    });
-
-    return Array.from(blockMap.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([visualGroup, cards]) => ({
-        visualGroup,
-        left: cards.filter((card) => card.area === "left"),
-        center: cards.filter((card) => card.area === "center"),
-        right: cards.filter((card) => card.area === "right"),
-      }));
-  }, [allCards]);
+  const leftCards = allCards.filter((c) => c.area === "left");
+  const centerCards = allCards.filter((c) => c.area === "center");
+  const rightCards = allCards.filter((c) => c.area === "right");
   const selectedCard =
     allCards.find((card) => card.id === selectedCardId) || null;
   const selectedFocusItem =
@@ -1118,7 +1102,7 @@ export default function Home() {
               event.stopPropagation();
               toggleStar(card.id);
             }}
-            className="shrink-0 text-[11pt] text-neutral-200 hover:text-neutral-200"
+            className="shrink-0 text-[11pt] text-neutral-500 hover:text-neutral-300"
             title="重要マーク"
           >
             {starred.includes(card.id) ? "★" : "☆"}
@@ -1195,57 +1179,30 @@ export default function Home() {
           moveCardToArea(draggedCardId, area);
           setDraggedCardId(null);
         }}
-        className={`min-h-12 space-y-3 rounded-xl transition ${
+        className={`min-h-16 space-y-3 rounded-xl transition ${
           draggedCardId ? "border border-dashed border-neutral-800 p-2" : ""
         }`}
       >
-        {items.map((card) => renderCard(card, isCenter))}
+        {items.map((card, index) => {
+          const prev = items[index - 1];
+          const hasSoftBreak =
+            index > 0 &&
+            card.visualGroup !== undefined &&
+            prev?.visualGroup !== undefined &&
+            card.visualGroup !== prev.visualGroup;
+
+          return (
+            <div key={card.id} className={hasSoftBreak ? "mt-7" : ""}>
+              {renderCard(card, isCenter)}
+            </div>
+          );
+        })}
         {draggedCardId && items.length === 0 && (
           <div className="rounded-xl border border-dashed border-neutral-800 p-4 text-center text-[10.5pt] text-neutral-600">
             ここへ移動
           </div>
         )}
       </section>
-    );
-  };
-
-  const renderCardBlock = (
-    block: { visualGroup: number; left: Card[]; center: Card[]; right: Card[] },
-    index: number,
-  ) => {
-    const hasCards =
-      block.left.length > 0 || block.center.length > 0 || block.right.length > 0;
-
-    if (!hasCards) return null;
-
-    return (
-      <div
-        key={block.visualGroup}
-        className={index === 0 ? "" : "mt-8 border-t border-neutral-900 pt-7"}
-      >
-        <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
-          <div className="space-y-2">
-            {perspective.left && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.left}</p>
-            )}
-            {renderColumn(block.left, "left")}
-          </div>
-
-          <div className="space-y-2">
-            {perspective.center && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.center}</p>
-            )}
-            {renderColumn(block.center, "center")}
-          </div>
-
-          <div className="space-y-2">
-            {perspective.right && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.right}</p>
-            )}
-            {renderColumn(block.right, "right")}
-          </div>
-        </div>
-      </div>
     );
   };
 
@@ -1609,7 +1566,34 @@ export default function Home() {
           {focusMode && selectedFocusItem ? (
             renderFocusedCard(selectedFocusItem)
           ) : (
-            <div>{cardBlocks.map((block, index) => renderCardBlock(block, index))}</div>
+            <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+              <div className="space-y-2">
+                {perspective.left && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.left}
+                  </p>
+                )}
+                {renderColumn(leftCards, "left")}
+              </div>
+
+              <div className="space-y-2">
+                {perspective.center && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.center}
+                  </p>
+                )}
+                {renderColumn(centerCards, "center")}
+              </div>
+
+              <div className="space-y-2">
+                {perspective.right && (
+                  <p className={`${mutedQuestionClass} px-1`}>
+                    {perspective.right}
+                  </p>
+                )}
+                {renderColumn(rightCards, "right")}
+              </div>
+            </div>
           )}
 
           {bottomSections.length > 0 && !focusMode && (
