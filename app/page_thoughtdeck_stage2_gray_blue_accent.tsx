@@ -49,6 +49,27 @@ const STORAGE_KEY = "thoughtdeck:v4";
 const MAX_URL_LENGTH = 3000;
 const THOUGHTDECK_HOME_URL = "https://thought-deck.vercel.app/";
 
+const placeholderSets = [
+  {
+    label: "発散",
+    left: "何が起きている？",
+    center: "どう考える？",
+    right: "何が論点？",
+  },
+  {
+    label: "再構造化",
+    left: "どう見える？",
+    center: "なぜそう思う？",
+    right: "どこで使える？",
+  },
+  {
+    label: "自由",
+    left: "",
+    center: "",
+    right: "",
+  },
+] as const;
+
 const blankRaw = `# タイトル
 
 ## 設問
@@ -370,6 +391,21 @@ export default function Home() {
   const [shareUrl, setShareUrl] = useState("");
   const [qrError, setQrError] = useState("");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [perspectiveIndex, setPerspectiveIndex] = useState(1);
+
+  const perspective = placeholderSets[perspectiveIndex];
+
+  const baseCardClass =
+    "border-neutral-700 bg-neutral-900 text-neutral-200 hover:border-blue-500/40 hover:bg-blue-950/5 hover:shadow-[0_0_0_1px_rgba(59,130,246,0.08)]";
+
+  const selectedThoughtClass =
+    "border-blue-500/60 bg-blue-950/10 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]";
+
+  const mutedQuestionClass = "text-[10.5pt] leading-none text-neutral-500";
+
+  const changePerspective = () => {
+    setPerspectiveIndex((prev) => (prev + 1) % placeholderSets.length);
+  };
 
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
@@ -544,8 +580,6 @@ export default function Home() {
     setStarred((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const selectedCardClass = "bg-white/10 ring-1 ring-white/20";
-
   const renderOneColumnSection = (section: OneColumnSection) => {
     const isSelected = selectedCardId === section.id;
 
@@ -553,13 +587,13 @@ export default function Home() {
       <section
         key={section.id}
         onClick={() => setSelectedCardId(section.id)}
-        className={`cursor-pointer rounded-xl border bg-blue-950/10 p-5 transition ${
-          isSelected ? `${selectedCardClass} border-blue-800` : "border-blue-900 hover:bg-white/5"
+        className={`cursor-pointer rounded-xl border p-4 transition ${
+          isSelected ? selectedThoughtClass : baseCardClass
         }`}
       >
-        <h3 className="mb-2 text-[13pt] font-bold text-blue-400">{section.title}</h3>
+        <h3 className="mb-1 text-[12pt] font-bold text-neutral-200">{section.title}</h3>
         {section.lines.length > 0 ? (
-          <div className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
+          <div className="space-y-0.5 break-words text-[11pt] leading-5 text-neutral-200">
             {section.lines.map((line, index) => (
               <p key={index}>{renderInline(line)}</p>
             ))}
@@ -578,25 +612,25 @@ export default function Home() {
       <div
         key={card.id}
         onClick={() => setSelectedCardId(card.id)}
-        className={`cursor-pointer rounded-xl border bg-neutral-900 p-4 transition ${
-          isSelected ? `${selectedCardClass} border-neutral-500` : "border-neutral-700 hover:bg-white/5"
+        className={`cursor-pointer rounded-xl border p-4 transition ${
+          isSelected ? selectedThoughtClass : baseCardClass
         }`}
       >
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <h3 className="w-full text-[13pt] font-bold text-blue-400">{card.title}</h3>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <h3 className="w-full text-[12pt] font-bold text-neutral-200">{card.title}</h3>
           <button
             onClick={(event) => {
               event.stopPropagation();
               toggleStar(card.id);
             }}
-            className="shrink-0 text-[11pt] text-neutral-400 hover:text-blue-300"
+            className="shrink-0 text-[11pt] text-neutral-500 hover:text-neutral-300"
             title="重要マーク"
           >
             {starred.includes(card.id) ? "★" : "☆"}
           </button>
         </div>
 
-        <ul className="space-y-1 break-words text-[11pt] leading-6 text-neutral-200">
+        <ul className="space-y-0.5 break-words text-[11pt] leading-5 text-neutral-200">
           {card.lines.map((line, index) => (
             <li key={index}>{renderInline(line)}</li>
           ))}
@@ -604,11 +638,11 @@ export default function Home() {
       </div>
     );
   };
-  const renderColumn = (items: Card[]) => <section className="space-y-4">{items.map(renderCard)}</section>;
+  const renderColumn = (items: Card[]) => <section className="space-y-3">{items.map(renderCard)}</section>;
 
-  const topButtonClass = "rounded-lg border border-neutral-600 px-3 py-2 text-[11pt] hover:border-blue-400 hover:text-blue-300";
-  const insertButtonClass = "rounded-lg border border-blue-800 px-3 py-2 text-[11pt] text-blue-400 hover:border-blue-500 hover:bg-blue-500/10 hover:text-blue-300";
-  const panelButtonClass = "rounded-lg border border-neutral-700 px-3 py-1.5 text-[11pt] text-neutral-300 hover:border-blue-500 hover:text-blue-300";
+  const topButtonClass = "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
+  const insertButtonClass = "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
+  const panelButtonClass = "rounded-lg border border-neutral-700 px-3 py-1.5 text-[11pt] text-neutral-300 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 lg:h-screen lg:overflow-hidden">
@@ -623,7 +657,7 @@ export default function Home() {
       `}</style>
 
       {obsidianToast && (
-        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-blue-700 bg-neutral-900 px-4 py-2 text-[11pt] text-blue-300 shadow-lg">
+        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-2 text-[11pt] text-neutral-300 shadow-lg">
           {obsidianToast}
         </div>
       )}
@@ -633,7 +667,9 @@ export default function Home() {
           <h1 className="text-[20px] font-bold leading-tight">
             <a
               href={THOUGHTDECK_HOME_URL}
-              className="text-neutral-100 no-underline transition-colors hover:text-blue-300"
+              target="_blank"
+              rel="noreferrer"
+              className="text-neutral-100 no-underline transition-colors hover:text-neutral-300"
             >
               ThoughtDeck
             </a>
@@ -643,9 +679,16 @@ export default function Home() {
 
         <div className="hidden flex-wrap items-center justify-end gap-3 lg:flex">
           <span className="text-[11pt] text-blue-400">✔ {saveStatus}</span>
-          {copyStatus && <span className="text-[11pt] text-blue-400">{copyStatus}</span>}
+          {copyStatus && <span className="text-[11pt] text-neutral-200">{copyStatus}</span>}
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
+            <button
+              onClick={changePerspective}
+              className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white"
+            >
+              🔄 視点を変える
+              <span className="ml-2 text-neutral-500">{perspective.label}</span>
+            </button>
             <button onClick={confirmLoadDemo} className={topButtonClass}>デモ</button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
           </div>
@@ -659,11 +702,11 @@ export default function Home() {
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
             <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
-            <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
+            <button onClick={createShare} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white">QR表示</button>
           </div>
         </div>
 
-        <div className="text-[11pt] text-blue-400 lg:hidden">
+        <div className="text-[11pt] text-neutral-200 lg:hidden">
           ✔ {saveStatus}{copyStatus ? ` / ${copyStatus}` : ""}
         </div>
       </header>
@@ -693,7 +736,7 @@ export default function Home() {
           <>
             <aside className="no-scrollbar w-full shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]" style={{ "--left-width": `${leftWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-blue-400">インプット</h2>
+                <h2 className="text-[13pt] font-bold text-neutral-200">インプット</h2>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setShowGuide((v) => !v)} className={panelButtonClass}>使い方</button>
                   <button onClick={() => setShowLeft(false)} className={panelButtonClass}>閉じる</button>
@@ -710,7 +753,7 @@ export default function Home() {
 
             {showGuide && (
               <div className="mb-3 rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-[11pt] leading-6 text-neutral-300">
-                <p className="font-bold text-blue-400">書き方</p>
+                <p className="font-bold text-neutral-200">書き方</p>
                 <p># タイトル</p>
                 <p>## 上部1カラム（設問・前提など）</p>
                 <p>### 3カラムカード見出し</p>
@@ -724,24 +767,24 @@ export default function Home() {
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
               placeholder="AI出力やObsidianの内容をここにコピペ..."
-              className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 font-mono text-[11pt] leading-6 outline-none focus:border-blue-400 max-lg:h-[42vh]"
+              className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 font-mono text-[11pt] leading-6 outline-none focus:border-neutral-500 max-lg:h-[42vh]"
             />
             </aside>
-            <div onMouseDown={() => setDraggingLeft(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400 max-lg:hidden" />
+            <div onMouseDown={() => setDraggingLeft(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden" />
           </>
         )}
 
                 {!showLeft && (
           <button
             onClick={() => setShowLeft(true)}
-            className="hidden w-9 shrink-0 border-r border-neutral-800 bg-neutral-900 text-[11pt] text-blue-400 hover:bg-blue-500/10 lg:block"
+            className="hidden w-9 shrink-0 border-r border-neutral-800 bg-neutral-900 text-[11pt] text-neutral-200 hover:bg-white/5 lg:block"
             title="Inputを開く"
           >
             ▶
           </button>
         )}
 
-<section className="no-scrollbar flex-1 overflow-auto p-6 max-lg:overflow-visible max-lg:p-4">
+<section className="no-scrollbar flex-1 overflow-auto p-4 max-lg:overflow-visible max-lg:p-4">
           <div className="mb-5 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
             <p className="text-[11pt] text-neutral-500">タイトル</p>
             <h2 className="text-xl font-bold">{title}</h2>
@@ -749,7 +792,15 @@ export default function Home() {
 
           {topSections.length > 0 && <div className="mb-5 space-y-4">{topSections.map(renderOneColumnSection)}</div>}
 
-          <div className="grid grid-cols-3 gap-5 max-xl:grid-cols-1">
+          {(perspective.left || perspective.center || perspective.right) && (
+            <div className="mb-2 grid grid-cols-3 gap-4 px-1 max-xl:grid-cols-1">
+              <p className={mutedQuestionClass}>{perspective.left}</p>
+              <p className={mutedQuestionClass}>{perspective.center}</p>
+              <p className={mutedQuestionClass}>{perspective.right}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
             {renderColumn(leftCards)}
             {renderColumn(centerCards)}
             {renderColumn(rightCards)}
@@ -761,7 +812,7 @@ export default function Home() {
         {!showRight && (
           <button
             onClick={() => setShowRight(true)}
-            className="hidden w-9 shrink-0 border-l border-neutral-800 bg-neutral-900 text-[11pt] text-blue-400 hover:bg-blue-500/10 lg:block"
+            className="hidden w-9 shrink-0 border-l border-neutral-800 bg-neutral-900 text-[11pt] text-neutral-200 hover:bg-white/5 lg:block"
             title="Memoを開く"
           >
             ◀
@@ -770,10 +821,10 @@ export default function Home() {
 
         {showRight && (
           <>
-            <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-blue-400 max-lg:hidden" />
+            <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden" />
             <aside className="no-scrollbar w-full shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]" style={{ "--right-width": `${rightWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-blue-400">学びの殴り書き</h2>
+                <h2 className="text-[13pt] font-bold text-neutral-200">学びの殴り書き</h2>
                 <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
               </div>
               <textarea
@@ -781,7 +832,7 @@ export default function Home() {
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
                 placeholder="授業中の気づき・違和感・発言メモを自由に書く..."
-                className="no-scrollbar h-[calc(100vh-150px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 text-[11pt] leading-6 outline-none focus:border-blue-400 max-lg:h-[34vh]"
+                className="no-scrollbar h-[calc(100vh-150px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 text-[11pt] leading-6 outline-none focus:border-neutral-500 max-lg:h-[34vh]"
               />
               <p className="mt-2 text-right text-[11pt] text-neutral-500">文字数：{memo.length}</p>
             </aside>
@@ -802,12 +853,17 @@ export default function Home() {
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
             <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
             <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
-            <button onClick={createShare} className="rounded-lg border border-blue-700 px-3 py-2 text-[11pt] text-blue-400 hover:bg-blue-500/10">QR表示</button>
+            <button onClick={createShare} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white">QR表示</button>
           </div>
 
           <div className="text-[10pt] text-neutral-500">
             ThoughtDeck —{" "}
-            <a href={THOUGHTDECK_HOME_URL} className="underline underline-offset-2 hover:text-neutral-300">
+            <a
+              href={THOUGHTDECK_HOME_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-neutral-300"
+            >
               thought-deck.vercel.app
             </a>
           </div>

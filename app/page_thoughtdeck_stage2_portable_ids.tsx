@@ -463,9 +463,9 @@ function buildObsidianMetaLines(
   ids: ObsidianExportIds,
   item: { type: "question" | "card" | "summary"; area?: Area },
 ) {
-  const areaLine = item.area ? `<!-- @area: ${item.area} -->\n` : "";
+  const areaLine = item.area ? `@area: ${item.area}\n` : "";
 
-  return `<!-- @card_id: ${generatePortableId("card")} -->\n<!-- @note_id: ${ids.noteId} -->\n<!-- @group_id: ${ids.groupId} -->\n<!-- @type: ${item.type} -->\n${areaLine}`;
+  return `@card_id: ${generatePortableId("card")}\n@note_id: ${ids.noteId}\n@group_id: ${ids.groupId}\n@type: ${item.type}\n${areaLine}`;
 }
 
 function injectPortableIdsForObsidian(markdown: string, ids: ObsidianExportIds) {
@@ -543,7 +543,7 @@ function buildExportMarkdown(
 
   const noteMeta =
     withPortableIds && activeIds
-      ? `<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- #${activeIds.groupId} -->\n\n`
+      ? `@note_id: ${activeIds.noteId}\n@group_id: ${activeIds.groupId}\n#${activeIds.groupId}\n\n`
       : "";
 
   const added =
@@ -574,7 +574,7 @@ function buildExportMarkdown(
 
   const memoMeta =
     withPortableIds && activeIds
-      ? `<!-- @memo_id: ${generatePortableId("memo")} -->\n<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- @type: memo -->\n\n`
+      ? `@memo_id: ${generatePortableId("memo")}\n@note_id: ${activeIds.noteId}\n@group_id: ${activeIds.groupId}\n@type: memo\n\n`
       : "";
 
   return `${noteMeta}${sourceMarkdown}${added}\n\n---\n\n## 学びの殴り書きメモ\n${memoMeta}${memo.trim() || "（メモなし）"}${footer}`;
@@ -618,9 +618,7 @@ function buildObsidianMarkdown(
   };
   const body = buildExportMarkdown(raw, addedCards, memo, false, true, ids).trimEnd();
 
-  const frontmatter = `---\nthoughtdeck_note_id: ${ids.noteId}\nthoughtdeck_group_id: ${ids.groupId}\ntags:\n  - thoughtdeck\n  - ${ids.groupId}\n---`;
-
-  return `${frontmatter}\n\n[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
+  return `[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
 }
 
 export default function Home() {
@@ -828,20 +826,6 @@ export default function Home() {
       if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
         event.preventDefault();
         selectSiblingCard(-1);
-      }
-
-      if (event.key.toLowerCase() === "i") {
-        event.preventDefault();
-        setExpandedEditor("input");
-        showShortcutHint("Inputを集中表示します");
-        return;
-      }
-
-      if (event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        setExpandedEditor("memo");
-        showShortcutHint("学習メモを集中表示します");
-        return;
       }
 
       if (event.key.toLowerCase() === "f") {

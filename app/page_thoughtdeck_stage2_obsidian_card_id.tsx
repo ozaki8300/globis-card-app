@@ -431,97 +431,30 @@ function renderInline(text: string) {
   });
 }
 
-type ThoughtDeckIdKind = "note" | "group" | "card" | "memo";
-
-const ID_PREFIX_BY_KIND: Record<ThoughtDeckIdKind, string> = {
-  note: "td_n",
-  group: "td_g",
-  card: "td_c",
-  memo: "td_m",
-};
-
-function normalizeUuid(rawId: string) {
-  return rawId.replace(/-/g, "");
-}
-
-function generatePortableId(kind: ThoughtDeckIdKind) {
-  const prefix = ID_PREFIX_BY_KIND[kind];
-
+function generateCardId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}_${normalizeUuid(crypto.randomUUID())}`;
+    return `td_${crypto.randomUUID()}`;
   }
 
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  return `td_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-type ObsidianExportIds = {
-  noteId: string;
-  groupId: string;
-};
-
-function buildObsidianMetaLines(
-  ids: ObsidianExportIds,
-  item: { type: "question" | "card" | "summary"; area?: Area },
-) {
-  const areaLine = item.area ? `<!-- @area: ${item.area} -->\n` : "";
-
-  return `<!-- @card_id: ${generatePortableId("card")} -->\n<!-- @note_id: ${ids.noteId} -->\n<!-- @group_id: ${ids.groupId} -->\n<!-- @type: ${item.type} -->\n${areaLine}`;
+function injectCardIdsForObsidian(markdown: string) {
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (/^@card_id:/.test(line.trim())) return line;
+      if (/^@area:\s*(left|center|right)\s*$/.test(line.trim())) {
+        return `@card_id: ${generateCardId()}\n${line}`;
+      }
+      return line;
+    })
+    .join("\n");
 }
 
-function injectPortableIdsForObsidian(markdown: string, ids: ObsidianExportIds) {
-  const lines = markdown.split("\n");
-  const result: string[] = [];
-  let pendingCardHeading = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (/^##\s*設問/.test(trimmed)) {
-      result.push(line);
-      result.push(buildObsidianMetaLines(ids, { type: "question" }).trimEnd());
-      continue;
-    }
-
-    if (/^##\s*まとめ/.test(trimmed)) {
-      result.push(line);
-      result.push(buildObsidianMetaLines(ids, { type: "summary" }).trimEnd());
-      continue;
-    }
-
-    if (/^###\s+/.test(trimmed)) {
-      pendingCardHeading = true;
-      result.push(line);
-      continue;
-    }
-
-    const areaMatch = trimmed.match(/^@area:\s*(left|center|right)\s*$/);
-    if (areaMatch && pendingCardHeading) {
-      result.push(
-        buildObsidianMetaLines(ids, {
-          type: "card",
-          area: areaMatch[1] as Area,
-        }).trimEnd(),
-      );
-      pendingCardHeading = false;
-      continue;
-    }
-
-    result.push(line);
-  }
-
-  return result.join("\n");
-}
-
-function addedCardToMarkdown(
-  card: AddedCard,
-  options?: { ids?: ObsidianExportIds; withPortableIds?: boolean },
-) {
-  const metaLines =
-    options?.withPortableIds && options.ids
-      ? buildObsidianMetaLines(options.ids, { type: "card", area: card.area })
-      : `@area: ${card.area}\n`;
-
-  return `### ${card.title || "見出し"}\n${metaLines}${card.lines.length ? card.lines.join("\n") : "- "}`;
+function addedCardToMarkdown(card: AddedCard, withCardId = false) {
+  const cardIdLine = withCardId ? `@card_id: ${generateCardId()}\n` : "";
+  return `### ${card.title || "見出し"}\n${cardIdLine}@area: ${card.area}\n${card.lines.length ? card.lines.join("\n") : "- "}`;
 }
 
 function buildExportMarkdown(
@@ -529,23 +462,8 @@ function buildExportMarkdown(
   addedCards: AddedCard[],
   memo: string,
   includeFooter = true,
-  withPortableIds = false,
-  ids?: ObsidianExportIds,
+  withCardIds = false,
 ) {
-  const activeIds =
-    ids ??
-    (withPortableIds
-      ? {
-          noteId: generatePortableId("note"),
-          groupId: generatePortableId("group"),
-        }
-      : undefined);
-
-  const noteMeta =
-    withPortableIds && activeIds
-      ? `<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- #${activeIds.groupId} -->\n\n`
-      : "";
-
   const added =
     addedCards.length > 0
       ? [
@@ -554,12 +472,7 @@ function buildExportMarkdown(
           "",
           "## 授業中に追加したカード",
           "",
-          ...addedCards.map((card) =>
-            addedCardToMarkdown(card, {
-              ids: activeIds,
-              withPortableIds,
-            }),
-          ),
+          ...addedCards.map((card) => addedCardToMarkdown(card, withCardIds)),
         ].join("\n")
       : "";
 
@@ -567,19 +480,12 @@ function buildExportMarkdown(
     ? `\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${new Date().toLocaleString("ja-JP")}\n`
     : "";
 
-  const sourceMarkdown =
-    withPortableIds && activeIds
-      ? injectPortableIdsForObsidian(raw.trimEnd(), activeIds)
-      : raw.trimEnd();
+  const sourceMarkdown = withCardIds
+    ? injectCardIdsForObsidian(raw.trimEnd())
+    : raw.trimEnd();
 
-  const memoMeta =
-    withPortableIds && activeIds
-      ? `<!-- @memo_id: ${generatePortableId("memo")} -->\n<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- @type: memo -->\n\n`
-      : "";
-
-  return `${noteMeta}${sourceMarkdown}${added}\n\n---\n\n## 学びの殴り書きメモ\n${memoMeta}${memo.trim() || "（メモなし）"}${footer}`;
+  return `${sourceMarkdown}${added}\n\n---\n\n## 学びの殴り書きメモ\n\n${memo.trim() || "（メモなし）"}${footer}`;
 }
-
 function buildRestoreUrl(
   raw: string,
   memo: string,
@@ -612,15 +518,9 @@ function buildObsidianMarkdown(
 ) {
   const restoreUrl = buildRestoreUrl(raw, memo, addedCards, starred);
   const title = getTitle(raw);
-  const ids: ObsidianExportIds = {
-    noteId: generatePortableId("note"),
-    groupId: generatePortableId("group"),
-  };
-  const body = buildExportMarkdown(raw, addedCards, memo, false, true, ids).trimEnd();
+  const body = buildExportMarkdown(raw, addedCards, memo, false, true).trimEnd();
 
-  const frontmatter = `---\nthoughtdeck_note_id: ${ids.noteId}\nthoughtdeck_group_id: ${ids.groupId}\ntags:\n  - thoughtdeck\n  - ${ids.groupId}\n---`;
-
-  return `${frontmatter}\n\n[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
+  return `[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
 }
 
 export default function Home() {
@@ -828,20 +728,6 @@ export default function Home() {
       if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
         event.preventDefault();
         selectSiblingCard(-1);
-      }
-
-      if (event.key.toLowerCase() === "i") {
-        event.preventDefault();
-        setExpandedEditor("input");
-        showShortcutHint("Inputを集中表示します");
-        return;
-      }
-
-      if (event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        setExpandedEditor("memo");
-        showShortcutHint("学習メモを集中表示します");
-        return;
       }
 
       if (event.key.toLowerCase() === "f") {

@@ -31,10 +31,6 @@ type OneColumnSection = {
   position: "top" | "bottom";
 };
 
-type FocusItem =
-  | (Card & { focusKind: "card"; focusLabel: string })
-  | (OneColumnSection & { focusKind: "section"; focusLabel: string });
-
 type DeckState = {
   raw: string;
   memo: string;
@@ -140,11 +136,7 @@ function decodeDeck(value: string): DeckState | null {
 }
 
 function getTitle(raw: string) {
-  const line = raw
-    .split("\n")
-    .find(
-      (l) => /^#[ \t\u3000]+/.test(l.trimEnd()) && !/^##/.test(l.trimStart()),
-    );
+  const line = raw.split("\n").find((l) => /^#[ \t\u3000]+/.test(l.trimEnd()) && !/^##/.test(l.trimStart()));
   return line?.replace(/^#[ \t\u3000]+/, "").trim() || "タイトル未設定";
 }
 
@@ -171,8 +163,7 @@ function sanitizeFileName(value: string) {
 
 function getObsidianTitle(title: string, timestamp: string) {
   const safeTitle = sanitizeFileName(title);
-  if (!safeTitle || safeTitle === "タイトル" || safeTitle === "タイトル未設定")
-    return timestamp;
+  if (!safeTitle || safeTitle === "タイトル" || safeTitle === "タイトル未設定") return timestamp;
   return `${timestamp}_${safeTitle}`;
 }
 
@@ -181,10 +172,7 @@ function isH1(line: string) {
 }
 
 function isH2(line: string) {
-  return (
-    /^##[ \t\u3000]+/.test(line.trimEnd()) &&
-    !/^###[ \t\u3000]+/.test(line.trimEnd())
-  );
+  return /^##[ \t\u3000]+/.test(line.trimEnd()) && !/^###[ \t\u3000]+/.test(line.trimEnd());
 }
 
 function isH3(line: string) {
@@ -197,9 +185,7 @@ function normalizeDisplayLines(lines: string[]) {
 
 function areaFromLine(line?: string): Area {
   const rawArea = line?.replace(/^@area:/, "").trim();
-  return rawArea === "left" || rawArea === "center" || rawArea === "right"
-    ? rawArea
-    : "center";
+  return rawArea === "left" || rawArea === "center" || rawArea === "right" ? rawArea : "center";
 }
 
 function parseDeck(raw: string): ParsedDeck {
@@ -223,9 +209,7 @@ function parseDeck(raw: string): ParsedDeck {
 
   const flushCard = () => {
     if (!currentCard) return;
-    currentCard.lines = normalizeDisplayLines(currentCard.lines).filter(
-      (line) => !line.startsWith("@area:"),
-    );
+    currentCard.lines = normalizeDisplayLines(currentCard.lines).filter((line) => !line.startsWith("@area:"));
     cards.push(currentCard);
     currentCard = null;
   };
@@ -267,8 +251,7 @@ function parseDeck(raw: string): ParsedDeck {
     }
 
     if (currentCard) {
-      if (trimmed.startsWith("@area:"))
-        currentCard.area = areaFromLine(trimmed);
+      if (trimmed.startsWith("@area:")) currentCard.area = areaFromLine(trimmed);
       else currentCard.lines.push(line);
       continue;
     }
@@ -353,10 +336,7 @@ function changeRawCardArea(raw: string, cardId: string, nextArea: Area) {
   }
 
   const areaLineIndex = lines.findIndex(
-    (line, index) =>
-      index > h3LineIndex &&
-      index < blockEnd &&
-      line.trim().startsWith("@area:"),
+    (line, index) => index > h3LineIndex && index < blockEnd && line.trim().startsWith("@area:")
   );
 
   if (areaLineIndex >= 0) {
@@ -368,41 +348,13 @@ function changeRawCardArea(raw: string, cardId: string, nextArea: Area) {
   return lines.join("\n");
 }
 
-function normalizeConclusionLine(line: string) {
-  const trimmed = line.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("-") ? `  ${trimmed}` : `  - ${trimmed}`;
-}
-
-function appendCardToConclusion(raw: string, card: Card) {
-  const cardLines = [
-    `- ${card.title || "選択カード"}`,
-    ...card.lines.map(normalizeConclusionLine).filter(Boolean),
-  ].join("\n");
-
-  const summaryMatch = raw.match(/^##[ \t\u3000]+まとめ\s*$/m);
-
-  if (!summaryMatch || summaryMatch.index === undefined) {
-    return `${raw.trimEnd()}\n\n## まとめ\n${cardLines}\n`;
-  }
-
-  const insertAt = summaryMatch.index + summaryMatch[0].length;
-  const before = raw.slice(0, insertAt);
-  const after = raw.slice(insertAt);
-  const needsNewLine = after.startsWith("\n") ? "" : "\n";
-  return `${before}${needsNewLine}\n${cardLines}${after}`;
-}
-
 function renderInline(text: string) {
   const parts = text.split(/(==.*?==|=[^=].*?=|\*\*.*?\*\*)/g);
 
   return parts.map((part, i) => {
     if (part.startsWith("==") && part.endsWith("==")) {
       return (
-        <mark
-          key={i}
-          className="rounded bg-yellow-300/80 px-1 text-neutral-950"
-        >
+        <mark key={i} className="rounded bg-yellow-300/80 px-1 text-neutral-950">
           {part.slice(2, -2)}
         </mark>
       );
@@ -410,10 +362,7 @@ function renderInline(text: string) {
 
     if (part.startsWith("=") && part.endsWith("=") && part.length > 2) {
       return (
-        <mark
-          key={i}
-          className="rounded bg-yellow-300/80 px-1 text-neutral-950"
-        >
+        <mark key={i} className="rounded bg-yellow-300/80 px-1 text-neutral-950">
           {part.slice(1, -1)}
         </mark>
       );
@@ -431,161 +380,23 @@ function renderInline(text: string) {
   });
 }
 
-type ThoughtDeckIdKind = "note" | "group" | "card" | "memo";
-
-const ID_PREFIX_BY_KIND: Record<ThoughtDeckIdKind, string> = {
-  note: "td_n",
-  group: "td_g",
-  card: "td_c",
-  memo: "td_m",
-};
-
-function normalizeUuid(rawId: string) {
-  return rawId.replace(/-/g, "");
+function addedCardToMarkdown(card: AddedCard) {
+  return `### ${card.title || "見出し"}\n@area: ${card.area}\n${card.lines.length ? card.lines.join("\n") : "- "}`;
 }
 
-function generatePortableId(kind: ThoughtDeckIdKind) {
-  const prefix = ID_PREFIX_BY_KIND[kind];
-
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}_${normalizeUuid(crypto.randomUUID())}`;
-  }
-
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-type ObsidianExportIds = {
-  noteId: string;
-  groupId: string;
-};
-
-function buildObsidianMetaLines(
-  ids: ObsidianExportIds,
-  item: { type: "question" | "card" | "summary"; area?: Area },
-) {
-  const areaLine = item.area ? `<!-- @area: ${item.area} -->\n` : "";
-
-  return `<!-- @card_id: ${generatePortableId("card")} -->\n<!-- @note_id: ${ids.noteId} -->\n<!-- @group_id: ${ids.groupId} -->\n<!-- @type: ${item.type} -->\n${areaLine}`;
-}
-
-function injectPortableIdsForObsidian(markdown: string, ids: ObsidianExportIds) {
-  const lines = markdown.split("\n");
-  const result: string[] = [];
-  let pendingCardHeading = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (/^##\s*設問/.test(trimmed)) {
-      result.push(line);
-      result.push(buildObsidianMetaLines(ids, { type: "question" }).trimEnd());
-      continue;
-    }
-
-    if (/^##\s*まとめ/.test(trimmed)) {
-      result.push(line);
-      result.push(buildObsidianMetaLines(ids, { type: "summary" }).trimEnd());
-      continue;
-    }
-
-    if (/^###\s+/.test(trimmed)) {
-      pendingCardHeading = true;
-      result.push(line);
-      continue;
-    }
-
-    const areaMatch = trimmed.match(/^@area:\s*(left|center|right)\s*$/);
-    if (areaMatch && pendingCardHeading) {
-      result.push(
-        buildObsidianMetaLines(ids, {
-          type: "card",
-          area: areaMatch[1] as Area,
-        }).trimEnd(),
-      );
-      pendingCardHeading = false;
-      continue;
-    }
-
-    result.push(line);
-  }
-
-  return result.join("\n");
-}
-
-function addedCardToMarkdown(
-  card: AddedCard,
-  options?: { ids?: ObsidianExportIds; withPortableIds?: boolean },
-) {
-  const metaLines =
-    options?.withPortableIds && options.ids
-      ? buildObsidianMetaLines(options.ids, { type: "card", area: card.area })
-      : `@area: ${card.area}\n`;
-
-  return `### ${card.title || "見出し"}\n${metaLines}${card.lines.length ? card.lines.join("\n") : "- "}`;
-}
-
-function buildExportMarkdown(
-  raw: string,
-  addedCards: AddedCard[],
-  memo: string,
-  includeFooter = true,
-  withPortableIds = false,
-  ids?: ObsidianExportIds,
-) {
-  const activeIds =
-    ids ??
-    (withPortableIds
-      ? {
-          noteId: generatePortableId("note"),
-          groupId: generatePortableId("group"),
-        }
-      : undefined);
-
-  const noteMeta =
-    withPortableIds && activeIds
-      ? `<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- #${activeIds.groupId} -->\n\n`
-      : "";
-
+function buildExportMarkdown(raw: string, addedCards: AddedCard[], memo: string, includeFooter = true) {
   const added =
     addedCards.length > 0
-      ? [
-          "",
-          "---",
-          "",
-          "## 授業中に追加したカード",
-          "",
-          ...addedCards.map((card) =>
-            addedCardToMarkdown(card, {
-              ids: activeIds,
-              withPortableIds,
-            }),
-          ),
-        ].join("\n")
+      ? ["", "---", "", "## 授業中に追加したカード", "", ...addedCards.map((card) => addedCardToMarkdown(card))].join("\n")
       : "";
 
   const footer = includeFooter
     ? `\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${new Date().toLocaleString("ja-JP")}\n`
     : "";
 
-  const sourceMarkdown =
-    withPortableIds && activeIds
-      ? injectPortableIdsForObsidian(raw.trimEnd(), activeIds)
-      : raw.trimEnd();
-
-  const memoMeta =
-    withPortableIds && activeIds
-      ? `<!-- @memo_id: ${generatePortableId("memo")} -->\n<!-- @note_id: ${activeIds.noteId} -->\n<!-- @group_id: ${activeIds.groupId} -->\n<!-- @type: memo -->\n\n`
-      : "";
-
-  return `${noteMeta}${sourceMarkdown}${added}\n\n---\n\n## 学びの殴り書きメモ\n${memoMeta}${memo.trim() || "（メモなし）"}${footer}`;
+  return `${raw.trimEnd()}${added}\n\n---\n\n## 学びの殴り書きメモ\n\n${memo.trim() || "（メモなし）"}${footer}`;
 }
-
-function buildRestoreUrl(
-  raw: string,
-  memo: string,
-  addedCards: AddedCard[],
-  starred: string[],
-) {
+function buildRestoreUrl(raw: string, memo: string, addedCards: AddedCard[], starred: string[]) {
   if (typeof window === "undefined") return "";
   const base = `${window.location.origin}${window.location.pathname}`;
   const deck: DeckState = { raw, memo, addedCards, starred };
@@ -604,24 +415,14 @@ function formatObsidianTimestamp(date = new Date()) {
   });
 }
 
-function buildObsidianMarkdown(
-  raw: string,
-  addedCards: AddedCard[],
-  memo: string,
-  starred: string[],
-) {
+function buildObsidianMarkdown(raw: string, addedCards: AddedCard[], memo: string, starred: string[]) {
   const restoreUrl = buildRestoreUrl(raw, memo, addedCards, starred);
   const title = getTitle(raw);
-  const ids: ObsidianExportIds = {
-    noteId: generatePortableId("note"),
-    groupId: generatePortableId("group"),
-  };
-  const body = buildExportMarkdown(raw, addedCards, memo, false, true, ids).trimEnd();
+  const body = buildExportMarkdown(raw, addedCards, memo, false).trimEnd();
 
-  const frontmatter = `---\nthoughtdeck_note_id: ${ids.noteId}\nthoughtdeck_group_id: ${ids.groupId}\ntags:\n  - thoughtdeck\n  - ${ids.groupId}\n---`;
-
-  return `${frontmatter}\n\n[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
+  return `[${title}](${restoreUrl})\n\n${body}\n\n---\n\n作成元: ThoughtDeck\n保存日時: ${formatObsidianTimestamp()}\n[thought-deck](${THOUGHTDECK_HOME_URL})\n`;
 }
+
 
 export default function Home() {
   const [raw, setRaw] = useState(blankRaw);
@@ -637,10 +438,6 @@ export default function Home() {
   const [qrError, setQrError] = useState("");
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
-  const [focusMode, setFocusMode] = useState(false);
-  const [expandedEditor, setExpandedEditor] = useState<"input" | "memo" | null>(
-    null,
-  );
   const [shortcutHint, setShortcutHint] = useState("");
   const [perspectiveIndex, setPerspectiveIndex] = useState(1);
 
@@ -671,40 +468,11 @@ export default function Home() {
   const parsedDeck = useMemo(() => parseDeck(raw), [raw]);
   const { title, topSections, bottomSections } = parsedDeck;
   const parsedCards = parsedDeck.cards;
-  const allCards = useMemo<Card[]>(
-    () => [...parsedCards, ...addedCards],
-    [parsedCards, addedCards],
-  );
-  const focusItems = useMemo<FocusItem[]>(() => {
-    const cardLabel = (area: Area) =>
-      area === "left" ? "事実" : area === "center" ? "解釈" : "論点";
-
-    return [
-      ...topSections.map((section) => ({
-        ...section,
-        focusKind: "section" as const,
-        focusLabel: "設問",
-      })),
-      ...allCards.map((card) => ({
-        ...card,
-        focusKind: "card" as const,
-        focusLabel: cardLabel(card.area),
-      })),
-      ...bottomSections.map((section) => ({
-        ...section,
-        focusKind: "section" as const,
-        focusLabel: "結論",
-      })),
-    ];
-  }, [topSections, allCards, bottomSections]);
-
+  const allCards = useMemo<Card[]>(() => [...parsedCards, ...addedCards], [parsedCards, addedCards]);
   const leftCards = allCards.filter((c) => c.area === "left");
   const centerCards = allCards.filter((c) => c.area === "center");
   const rightCards = allCards.filter((c) => c.area === "right");
-  const selectedCard =
-    allCards.find((card) => card.id === selectedCardId) || null;
-  const selectedFocusItem =
-    focusItems.find((item) => item.id === selectedCardId) || null;
+  const selectedCard = allCards.find((card) => card.id === selectedCardId) || null;
 
   const showShortcutHint = (message: string) => {
     setShortcutHint(message);
@@ -721,9 +489,7 @@ export default function Home() {
       setRaw((prev) => changeRawCardArea(prev, cardId, nextArea));
     } else {
       setAddedCards((prev) =>
-        prev.map((card) =>
-          card.id === cardId ? { ...card, area: nextArea } : card,
-        ),
+        prev.map((card) => (card.id === cardId ? { ...card, area: nextArea } : card))
       );
     }
 
@@ -738,9 +504,7 @@ export default function Home() {
       ? allCards.findIndex((card) => card.id === selectedCardId)
       : -1;
     const nextIndex =
-      currentIndex < 0
-        ? 0
-        : (currentIndex + direction + allCards.length) % allCards.length;
+      currentIndex < 0 ? 0 : (currentIndex + direction + allCards.length) % allCards.length;
 
     setSelectedCardId(allCards[nextIndex].id);
   };
@@ -778,10 +542,7 @@ export default function Home() {
   useEffect(() => {
     setSaveStatus("保存中");
     const timer = window.setTimeout(() => {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ raw, memo, addedCards, starred }),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ raw, memo, addedCards, starred }));
       setSaveStatus("保存済");
     }, 300);
     return () => window.clearTimeout(timer);
@@ -814,9 +575,9 @@ export default function Home() {
         moveCardToArea(selectedCardId, "right");
       }
 
-      if (event.key.toLowerCase() === "s" && selectedCard) {
+      if (event.key.toLowerCase() === "s" && selectedCardId) {
         event.preventDefault();
-        toggleStar(selectedCard.id);
+        toggleStar(selectedCardId);
         showShortcutHint("★ 重要マークを切り替えました");
       }
 
@@ -830,51 +591,18 @@ export default function Home() {
         selectSiblingCard(-1);
       }
 
-      if (event.key.toLowerCase() === "i") {
-        event.preventDefault();
-        setExpandedEditor("input");
-        showShortcutHint("Inputを集中表示します");
-        return;
-      }
-
-      if (event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        setExpandedEditor("memo");
-        showShortcutHint("学習メモを集中表示します");
-        return;
-      }
-
-      if (event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        if (!selectedFocusItem) {
-          showShortcutHint("フォーカスするカードを選択してください");
-          return;
-        }
-        setFocusMode((prev) => !prev);
-      }
-
       if (event.key === "Escape") {
-        if (expandedEditor) setExpandedEditor(null);
-        else if (focusMode) setFocusMode(false);
-        else setSelectedCardId(null);
+        setSelectedCardId(null);
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    selectedCardId,
-    selectedCard,
-    selectedFocusItem,
-    allCards,
-    focusMode,
-    expandedEditor,
-  ]);
+  }, [selectedCardId, allCards]);
 
   useEffect(() => {
     if (!draggingLeft) return;
-    const onMove = (e: MouseEvent) =>
-      setLeftWidth(Math.min(Math.max(e.clientX, 260), 680));
+    const onMove = (e: MouseEvent) => setLeftWidth(Math.min(Math.max(e.clientX, 260), 680));
     const onUp = () => setDraggingLeft(false);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -886,10 +614,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!draggingRight) return;
-    const onMove = (e: MouseEvent) =>
-      setRightWidth(
-        Math.min(Math.max(window.innerWidth - e.clientX, 260), 680),
-      );
+    const onMove = (e: MouseEvent) => setRightWidth(Math.min(Math.max(window.innerWidth - e.clientX, 260), 680));
     const onUp = () => setDraggingRight(false);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -905,9 +630,7 @@ export default function Home() {
     const url = `${base}?d=${encodeURIComponent(encodeDeck(deck))}`;
     setShareUrl(url);
     if (url.length > MAX_URL_LENGTH) {
-      setQrError(
-        `共有URLが長すぎます（${url.length}文字）。URLコピーは可能ですが、QR表示には向きません。`,
-      );
+      setQrError(`共有URLが長すぎます（${url.length}文字）。URLコピーは可能ですが、QR表示には向きません。`);
     } else {
       setQrError("");
     }
@@ -929,9 +652,7 @@ export default function Home() {
   };
 
   const copyMd = async () => {
-    await navigator.clipboard.writeText(
-      buildExportMarkdown(raw, addedCards, memo),
-    );
+    await navigator.clipboard.writeText(buildExportMarkdown(raw, addedCards, memo));
     setCopyStatus("MDコピー済");
     window.setTimeout(() => setCopyStatus(""), 1800);
   };
@@ -957,7 +678,6 @@ export default function Home() {
     setQrError("");
     setShowQr(false);
     setSelectedCardId(null);
-    setFocusMode(false);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -970,13 +690,12 @@ export default function Home() {
     setQrError("");
     setShowQr(false);
     setSelectedCardId(null);
-    setFocusMode(false);
     setShowLeft(false);
   };
 
   const confirmLoadDemo = () => {
     const ok = window.confirm(
-      "現在の入力内容・学びメモ・追加状態がデモ内容で上書きされます。よろしいですか？",
+      "現在の入力内容・学びメモ・追加状態がデモ内容で上書きされます。よろしいですか？"
     );
 
     if (!ok) return;
@@ -994,9 +713,7 @@ export default function Home() {
   };
 
   const toggleStar = (id: string) => {
-    setStarred((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
+    setStarred((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const renderOneColumnSection = (section: OneColumnSection) => {
@@ -1010,9 +727,7 @@ export default function Home() {
           isSelected ? selectedThoughtClass : baseCardClass
         }`}
       >
-        <h3 className="mb-1 text-[12pt] font-bold text-neutral-200">
-          {section.title}
-        </h3>
+        <h3 className="mb-1 text-[12pt] font-bold text-neutral-200">{section.title}</h3>
         {section.lines.length > 0 ? (
           <div className="space-y-0.5 break-words text-[11pt] leading-5 text-neutral-200">
             {section.lines.map((line, index) => (
@@ -1020,9 +735,7 @@ export default function Home() {
             ))}
           </div>
         ) : (
-          <p className="text-[11pt] text-neutral-500">
-            本文はInput欄に入力してください。
-          </p>
+          <p className="text-[11pt] text-neutral-500">本文はInput欄に入力してください。</p>
         )}
       </section>
     );
@@ -1050,9 +763,7 @@ export default function Home() {
         }`}
       >
         <div className="mb-2 flex items-start justify-between gap-3">
-          <h3 className="w-full text-[12pt] font-bold text-neutral-100">
-            {card.title}
-          </h3>
+          <h3 className="w-full text-[12pt] font-bold text-neutral-100">{card.title}</h3>
           <button
             onClick={(event) => {
               event.stopPropagation();
@@ -1070,52 +781,6 @@ export default function Home() {
             <li key={index}>{renderInline(line)}</li>
           ))}
         </ul>
-      </div>
-    );
-  };
-
-  const renderFocusedCard = (item: FocusItem) => {
-    const areaLabel = item.focusLabel;
-
-    return (
-      <div className="mx-auto flex min-h-[55vh] max-w-5xl flex-col justify-center">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[10.5pt] text-neutral-500">フォーカス中</p>
-            <h2 className="text-[18pt] font-bold text-neutral-100">
-              {item.title}
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[10.5pt] text-neutral-500">
-            <span className="rounded-full border border-neutral-700 px-3 py-1">
-              {areaLabel}
-            </span>
-            <span>F / Esc：戻る</span>
-          </div>
-        </div>
-
-        <section className="rounded-2xl border border-blue-500/60 bg-blue-950/10 p-7 shadow-[0_0_0_1px_rgba(59,130,246,0.16)]">
-          <div className="space-y-2 break-words text-[14pt] leading-8 text-neutral-100">
-            {item.lines.length > 0 ? (
-              item.lines.map((line, index) => (
-                <p key={index}>{renderInline(line)}</p>
-              ))
-            ) : (
-              <p className="text-neutral-500">
-                本文はInput欄に入力してください。
-              </p>
-            )}
-          </div>
-        </section>
-
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
-          <button
-            onClick={() => setFocusMode(false)}
-            className="rounded-lg border border-neutral-700 px-4 py-2 text-[11pt] text-neutral-200 transition hover:border-neutral-500 hover:bg-white/5"
-          >
-            一覧に戻る
-          </button>
-        </div>
       </div>
     );
   };
@@ -1153,84 +818,12 @@ export default function Home() {
     );
   };
 
-  const renderExpandedEditor = () => {
-    if (!expandedEditor) return null;
-
-    const isInput = expandedEditor === "input";
-    const title = isInput
-      ? "インプット（集中モード）"
-      : "学びの殴り書き（集中モード）";
-    const value = isInput ? raw : memo;
-    const setValue = isInput ? setRaw : setMemo;
-    const placeholder = isInput
-      ? "AI出力やObsidianの内容をここにコピペ..."
-      : "授業中の気づき・違和感・発言メモを自由に書く...";
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-        <section className="flex h-[86vh] w-full max-w-6xl flex-col rounded-2xl border border-neutral-700 bg-neutral-950 shadow-2xl">
-          <div className="flex items-center justify-between gap-3 border-b border-neutral-800 px-5 py-4">
-            <div>
-              <p className="text-[10.5pt] text-neutral-500">
-                Esc：閉じる / Ctrl+Enter：保存して閉じる
-              </p>
-              <h2 className="text-[15pt] font-bold text-neutral-100">
-                {title}
-              </h2>
-            </div>
-            <button
-              onClick={() => setExpandedEditor(null)}
-              className="rounded-lg border border-neutral-700 px-4 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white"
-            >
-              閉じる
-            </button>
-          </div>
-
-          <textarea
-            autoFocus
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setExpandedEditor(null);
-              }
-              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                event.preventDefault();
-                setExpandedEditor(null);
-              }
-            }}
-            placeholder={placeholder}
-            className={`no-scrollbar flex-1 resize-none bg-neutral-950 p-6 outline-none ${
-              isInput
-                ? "font-mono text-[12pt] leading-7 text-neutral-100"
-                : "text-[13pt] leading-8 text-neutral-100"
-            }`}
-          />
-
-          <div className="flex items-center justify-between border-t border-neutral-800 px-5 py-3 text-[10.5pt] text-neutral-500">
-            <span>
-              {isInput
-                ? "Inputが唯一の元データです"
-                : "授業中の気づきだけに集中できます"}
-            </span>
-            <span>文字数：{value.length}</span>
-          </div>
-        </section>
-      </div>
-    );
-  };
-
-  const topButtonClass =
-    "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
-  const insertButtonClass =
-    "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
-  const panelButtonClass =
-    "rounded-lg border border-neutral-700 px-3 py-1.5 text-[11pt] text-neutral-300 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
+  const topButtonClass = "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
+  const insertButtonClass = "rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
+  const panelButtonClass = "rounded-lg border border-neutral-700 px-3 py-1.5 text-[11pt] text-neutral-300 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white";
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 lg:h-screen lg:overflow-hidden">
-      {renderExpandedEditor()}
       <style jsx global>{`
         .no-scrollbar {
           scrollbar-width: none;
@@ -1270,9 +863,7 @@ export default function Home() {
 
         <div className="hidden flex-wrap items-center justify-end gap-3 lg:flex">
           <span className="text-[11pt] text-blue-400">✔ {saveStatus}</span>
-          {copyStatus && (
-            <span className="text-[11pt] text-neutral-200">{copyStatus}</span>
-          )}
+          {copyStatus && <span className="text-[11pt] text-neutral-200">{copyStatus}</span>}
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
             <button
@@ -1282,111 +873,49 @@ export default function Home() {
               🔄 視点を変える
               <span className="ml-2 text-neutral-500">{perspective.label}</span>
             </button>
-            <button
-              onClick={() => {
-                if (!selectedFocusItem) {
-                  showShortcutHint("フォーカスするカードを選択してください");
-                  return;
-                }
-                setFocusMode((prev) => !prev);
-              }}
-              className={`rounded-lg border px-3 py-2 text-[11pt] transition ${
-                focusMode
-                  ? "border-blue-500/60 bg-blue-950/20 text-blue-100"
-                  : "border-neutral-700 text-neutral-200 hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white"
-              }`}
-            >
-              Focus
-            </button>
             {selectedCard && (
               <span className="hidden px-2 text-[10.5pt] text-neutral-500 xl:inline">
-                1/2/3で移動・Sで★・Fで集中
+                1/2/3で移動・Sで★
               </span>
             )}
-            <button onClick={confirmLoadDemo} className={topButtonClass}>
-              デモ
-            </button>
-            <button
-              onClick={clearAll}
-              className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40"
-            >
-              クリア
-            </button>
+            <button onClick={confirmLoadDemo} className={topButtonClass}>デモ</button>
+            <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
           </div>
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
-            <button
-              onClick={() => setShowLeft((v) => !v)}
-              className={topButtonClass}
-            >
-              Input
-            </button>
-            <button
-              onClick={() => setShowRight((v) => !v)}
-              className={topButtonClass}
-            >
-              Memo
-            </button>
+            <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>Input</button>
+            <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>Memo</button>
           </div>
 
           <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900/60 p-1">
-            <button onClick={downloadMd} className={topButtonClass}>
-              MD保存
-            </button>
-            <button onClick={copyMd} className={topButtonClass}>
-              MDコピー
-            </button>
-            <button onClick={saveToObsidian} className={topButtonClass}>
-              Obsidian保存
-            </button>
-            <button
-              onClick={createShare}
-              className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white"
-            >
-              QR表示
-            </button>
+            <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
+            <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
+            <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
+            <button onClick={createShare} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white">QR表示</button>
           </div>
         </div>
 
         <div className="text-[11pt] text-neutral-200 lg:hidden">
-          ✔ {saveStatus}
-          {copyStatus ? ` / ${copyStatus}` : ""}
+          ✔ {saveStatus}{copyStatus ? ` / ${copyStatus}` : ""}
         </div>
       </header>
 
       {showQr && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-8">
           <h2 className="mb-3 text-[13pt] font-bold">{title}</h2>
-          <p className="mb-4 text-[11pt] text-neutral-400">
-            QRまたはURLでDeckを共有
-          </p>
+          <p className="mb-4 text-[11pt] text-neutral-400">QRまたはURLでDeckを共有</p>
 
           {qrError ? (
-            <div className="mb-5 max-w-2xl rounded-xl border border-red-800 bg-red-950/50 p-4 text-[11pt] text-red-300">
-              {qrError}
-            </div>
+            <div className="mb-5 max-w-2xl rounded-xl border border-red-800 bg-red-950/50 p-4 text-[11pt] text-red-300">{qrError}</div>
           ) : (
-            <div className="rounded-2xl bg-white p-5">
-              <QRCodeSVG value={shareUrl} size={320} />
-            </div>
+            <div className="rounded-2xl bg-white p-5"><QRCodeSVG value={shareUrl} size={320} /></div>
           )}
 
-          <textarea
-            value={shareUrl}
-            readOnly
-            className="mt-6 h-24 w-full max-w-3xl resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-[11pt] leading-[1.45] text-neutral-300 outline-none"
-          />
+          <textarea value={shareUrl} readOnly className="mt-6 h-24 w-full max-w-3xl resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-[11pt] leading-[1.45] text-neutral-300 outline-none" />
 
           <div className="mt-4 flex gap-3">
-            <button
-              onClick={() => navigator.clipboard.writeText(shareUrl)}
-              className={topButtonClass}
-            >
-              URLコピー
-            </button>
-            <button onClick={() => setShowQr(false)} className={topButtonClass}>
-              閉じる
-            </button>
+            <button onClick={() => navigator.clipboard.writeText(shareUrl)} className={topButtonClass}>URLコピー</button>
+            <button onClick={() => setShowQr(false)} className={topButtonClass}>閉じる</button>
           </div>
         </div>
       )}
@@ -1394,101 +923,47 @@ export default function Home() {
       <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible">
         {showLeft && (
           <>
-            <aside
-              className="no-scrollbar w-full shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]"
-              style={{ "--left-width": `${leftWidth}px` } as CSSProperties}
-            >
+            <aside className="no-scrollbar w-full shrink-0 overflow-auto border-r border-neutral-800 p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]" style={{ "--left-width": `${leftWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-neutral-200">
-                  インプット
-                </h2>
+                <h2 className="text-[13pt] font-bold text-neutral-200">インプット</h2>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setExpandedEditor("input")}
-                    className={panelButtonClass}
-                  >
-                    拡大
-                  </button>
-                  <button
-                    onClick={() => setShowGuide((v) => !v)}
-                    className={panelButtonClass}
-                  >
-                    使い方
-                  </button>
-                  <button
-                    onClick={() => setShowLeft(false)}
-                    className={panelButtonClass}
-                  >
-                    閉じる
-                  </button>
+                  <button onClick={() => setShowGuide((v) => !v)} className={panelButtonClass}>使い方</button>
+                  <button onClick={() => setShowLeft(false)} className={panelButtonClass}>閉じる</button>
                 </div>
               </div>
 
-              <div className="mb-3 grid grid-cols-5 gap-2">
-                <button
-                  onClick={() => insertTemplate("top")}
-                  className={insertButtonClass}
-                  title="上部1カラムを追加"
-                >
-                  ＋上
-                </button>
-                <button
-                  onClick={() => insertTemplate("left")}
-                  className={insertButtonClass}
-                  title="左カードを追加"
-                >
-                  ＋左
-                </button>
-                <button
-                  onClick={() => insertTemplate("center")}
-                  className={insertButtonClass}
-                  title="中央カードを追加"
-                >
-                  ＋中
-                </button>
-                <button
-                  onClick={() => insertTemplate("right")}
-                  className={insertButtonClass}
-                  title="右カードを追加"
-                >
-                  ＋右
-                </button>
-                <button
-                  onClick={() => insertTemplate("bottom")}
-                  className={insertButtonClass}
-                  title="下部1カラムを追加"
-                >
-                  ＋下
-                </button>
+            <div className="mb-3 grid grid-cols-5 gap-2">
+              <button onClick={() => insertTemplate("top")} className={insertButtonClass} title="上部1カラムを追加">＋上</button>
+              <button onClick={() => insertTemplate("left")} className={insertButtonClass} title="左カードを追加">＋左</button>
+              <button onClick={() => insertTemplate("center")} className={insertButtonClass} title="中央カードを追加">＋中</button>
+              <button onClick={() => insertTemplate("right")} className={insertButtonClass} title="右カードを追加">＋右</button>
+              <button onClick={() => insertTemplate("bottom")} className={insertButtonClass} title="下部1カラムを追加">＋下</button>
+            </div>
+
+            {showGuide && (
+              <div className="mb-3 rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-[11pt] leading-6 text-neutral-300">
+                <p className="font-bold text-neutral-200">書き方</p>
+                <p># タイトル</p>
+                <p>## 上部1カラム（設問・前提など）</p>
+                <p>### 3カラムカード見出し</p>
+                <p>@area: left / center / right</p>
+                <p>## 下部1カラム（まとめ・次回アクションなど）</p>
+                <p>==強調== / **太字** に対応</p>
               </div>
+            )}
 
-              {showGuide && (
-                <div className="mb-3 rounded-xl border border-neutral-700 bg-neutral-900 p-3 text-[11pt] leading-6 text-neutral-300">
-                  <p className="font-bold text-neutral-200">書き方</p>
-                  <p># タイトル</p>
-                  <p>## 上部1カラム（設問・前提など）</p>
-                  <p>### 3カラムカード見出し</p>
-                  <p>@area: left / center / right</p>
-                  <p>## 下部1カラム（まとめ・次回アクションなど）</p>
-                  <p>==強調== / **太字** に対応</p>
-                </div>
-              )}
-
-              <textarea
-                value={raw}
-                onChange={(e) => setRaw(e.target.value)}
-                placeholder="AI出力やObsidianの内容をここにコピペ..."
-                className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 font-mono text-[11pt] leading-6 outline-none focus:border-neutral-500 max-lg:h-[42vh]"
-              />
-            </aside>
-            <div
-              onMouseDown={() => setDraggingLeft(true)}
-              className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden"
+            <textarea
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+              placeholder="AI出力やObsidianの内容をここにコピペ..."
+              className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 font-mono text-[11pt] leading-6 outline-none focus:border-neutral-500 max-lg:h-[42vh]"
             />
+            </aside>
+            <div onMouseDown={() => setDraggingLeft(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden" />
           </>
         )}
 
-        {!showLeft && (
+                {!showLeft && (
           <button
             onClick={() => setShowLeft(true)}
             className="hidden w-9 shrink-0 border-r border-neutral-800 bg-neutral-900 text-[11pt] text-neutral-200 hover:bg-white/5 lg:block"
@@ -1498,56 +973,40 @@ export default function Home() {
           </button>
         )}
 
-        <section className="no-scrollbar flex-1 overflow-auto p-4 max-lg:overflow-visible max-lg:p-4">
+<section className="no-scrollbar flex-1 overflow-auto p-4 max-lg:overflow-visible max-lg:p-4">
           <div className="mb-5 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
             <p className="text-[11pt] text-neutral-500">タイトル</p>
             <h2 className="text-xl font-bold">{title}</h2>
           </div>
 
-          {topSections.length > 0 && !focusMode && (
-            <div className="mb-5 space-y-4">
-              {topSections.map(renderOneColumnSection)}
+          {topSections.length > 0 && <div className="mb-5 space-y-4">{topSections.map(renderOneColumnSection)}</div>}
+
+          <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
+            <div className="space-y-2">
+              {perspective.left && (
+                <p className={`${mutedQuestionClass} px-1`}>{perspective.left}</p>
+              )}
+              {renderColumn(leftCards, "left")}
             </div>
-          )}
 
-          {focusMode && selectedFocusItem ? (
-            renderFocusedCard(selectedFocusItem)
-          ) : (
-            <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
-              <div className="space-y-2">
-                {perspective.left && (
-                  <p className={`${mutedQuestionClass} px-1`}>
-                    {perspective.left}
-                  </p>
-                )}
-                {renderColumn(leftCards, "left")}
-              </div>
-
-              <div className="space-y-2">
-                {perspective.center && (
-                  <p className={`${mutedQuestionClass} px-1`}>
-                    {perspective.center}
-                  </p>
-                )}
-                {renderColumn(centerCards, "center")}
-              </div>
-
-              <div className="space-y-2">
-                {perspective.right && (
-                  <p className={`${mutedQuestionClass} px-1`}>
-                    {perspective.right}
-                  </p>
-                )}
-                {renderColumn(rightCards, "right")}
-              </div>
+            <div className="space-y-2">
+              {perspective.center && (
+                <p className={`${mutedQuestionClass} px-1`}>{perspective.center}</p>
+              )}
+              {renderColumn(centerCards, "center")}
             </div>
-          )}
 
-          {bottomSections.length > 0 && !focusMode && (
+            <div className="space-y-2">
+              {perspective.right && (
+                <p className={`${mutedQuestionClass} px-1`}>{perspective.right}</p>
+              )}
+              {renderColumn(rightCards, "right")}
+            </div>
+          </div>
+
+          {bottomSections.length > 0 && (
             <div className="mt-5 border-t border-neutral-800 pt-4">
-              <div className="mb-2 px-1 text-[10.5pt] text-neutral-500">
-                結論
-              </div>
+              <div className="mb-2 px-1 text-[10.5pt] text-neutral-500">結論</div>
               <div className="space-y-4">
                 {bottomSections.map((section) => {
                   const isSelected = selectedCardId === section.id;
@@ -1597,32 +1056,11 @@ export default function Home() {
 
         {showRight && (
           <>
-            <div
-              onMouseDown={() => setDraggingRight(true)}
-              className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden"
-            />
-            <aside
-              className="no-scrollbar w-full shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]"
-              style={{ "--right-width": `${rightWidth}px` } as CSSProperties}
-            >
+            <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-neutral-800 hover:bg-neutral-500 max-lg:hidden" />
+            <aside className="no-scrollbar w-full shrink-0 overflow-auto border-l border-neutral-800 p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]" style={{ "--right-width": `${rightWidth}px` } as CSSProperties}>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-neutral-200">
-                  学びの殴り書き
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setExpandedEditor("memo")}
-                    className={panelButtonClass}
-                  >
-                    拡大
-                  </button>
-                  <button
-                    onClick={() => setShowRight(false)}
-                    className={panelButtonClass}
-                  >
-                    閉じる
-                  </button>
-                </div>
+                <h2 className="text-[13pt] font-bold text-neutral-200">学びの殴り書き</h2>
+                <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
               </div>
               <textarea
                 ref={memoRef}
@@ -1631,9 +1069,7 @@ export default function Home() {
                 placeholder="授業中の気づき・違和感・発言メモを自由に書く..."
                 className="no-scrollbar h-[calc(100vh-150px)] w-full resize-none rounded-xl border border-neutral-700 bg-neutral-900 p-4 text-[11pt] leading-6 outline-none focus:border-neutral-500 max-lg:h-[34vh]"
               />
-              <p className="mt-2 text-right text-[11pt] text-neutral-500">
-                文字数：{memo.length}
-              </p>
+              <p className="mt-2 text-right text-[11pt] text-neutral-500">文字数：{memo.length}</p>
             </aside>
           </>
         )}
@@ -1642,45 +1078,17 @@ export default function Home() {
       <footer className="border-t border-neutral-800 bg-neutral-950 p-3 lg:hidden">
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
-            <button onClick={confirmLoadDemo} className={topButtonClass}>
-              デモ
-            </button>
-            <button
-              onClick={clearAll}
-              className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40"
-            >
-              クリア
-            </button>
-            <button
-              onClick={() => setShowLeft((v) => !v)}
-              className={topButtonClass}
-            >
-              Input
-            </button>
-            <button
-              onClick={() => setShowRight((v) => !v)}
-              className={topButtonClass}
-            >
-              Memo
-            </button>
+            <button onClick={confirmLoadDemo} className={topButtonClass}>デモ</button>
+            <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
+            <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>Input</button>
+            <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>Memo</button>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-1">
-            <button onClick={downloadMd} className={topButtonClass}>
-              MD保存
-            </button>
-            <button onClick={copyMd} className={topButtonClass}>
-              MDコピー
-            </button>
-            <button onClick={saveToObsidian} className={topButtonClass}>
-              Obsidian保存
-            </button>
-            <button
-              onClick={createShare}
-              className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white"
-            >
-              QR表示
-            </button>
+            <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
+            <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
+            <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
+            <button onClick={createShare} className="rounded-lg border border-neutral-700 px-3 py-2 text-[11pt] text-neutral-200 transition hover:border-blue-500/50 hover:bg-blue-950/10 hover:text-white">QR表示</button>
           </div>
 
           <div className="text-[10pt] text-neutral-500">
