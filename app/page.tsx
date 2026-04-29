@@ -940,11 +940,40 @@ export default function Home() {
   };
 
 
-  const openQuickLink = (event: React.MouseEvent, url: string) => {
-    event.preventDefault();
+  const copyTextSafely = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+  };
+
+  const isMobileLike = () => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 768 || window.matchMedia?.("(pointer: coarse)").matches;
+  };
+
+  const handleResourceLinkClick = async (event: React.MouseEvent<HTMLAnchorElement>, url: string) => {
     event.stopPropagation();
-    setOpenTopMenu(null);
-    window.location.href = url;
+
+    if (isMobileLike()) {
+      event.preventDefault();
+      await copyTextSafely(url);
+      showShortcutHint("URLをコピーしました");
+      window.setTimeout(() => setOpenTopMenu(null), 250);
+      return;
+    }
+
+    window.setTimeout(() => setOpenTopMenu(null), 300);
   };
 
   const addTemplate = () => {
@@ -1901,73 +1930,6 @@ export default function Home() {
         </div>
       )}
 
-      {openTopMenu === "resources" && (
-        <div
-          className="fixed inset-0 z-[70] bg-[var(--td-overlay)] p-4 backdrop-blur-sm lg:hidden"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setOpenTopMenu(null);
-          }}
-        >
-          <section className="mx-auto mt-16 max-h-[80vh] w-full max-w-sm overflow-auto rounded-2xl border border-[var(--td-border)] bg-[var(--td-bg)] p-4 shadow-2xl">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10pt] text-[var(--td-muted)]">公式リンク / 追加リンク</p>
-                <h2 className="text-[15pt] font-bold text-[var(--td-text)]">リンク</h2>
-              </div>
-              <button onClick={() => setOpenTopMenu(null)} className={topButtonClass}>閉じる</button>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              {allQuickLinks.map((link, index) => {
-                const isCustom = index >= defaultQuickLinks.length;
-                return (
-                  <div key={`${link.label}-${link.url}-${index}`} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className={`${topButtonClass} flex-1 text-center no-underline`}
-                      onClick={(event) => openQuickLink(event, link.url)}
-                    >
-                      {link.label}
-                    </button>
-                    {isCustom && (
-                      <button
-                        onClick={() => removeCustomLink(index - defaultQuickLinks.length)}
-                        className="rounded-lg border border-[var(--td-border)] px-2 py-2 text-[10pt] text-[var(--td-muted)] hover:border-red-800 hover:text-red-400"
-                        title="削除"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-4 border-t border-[var(--td-border)] pt-4">
-              <p className="mb-2 text-[10pt] text-[var(--td-muted)]">追加リンク</p>
-              <input
-                value={customLinkLabel}
-                onChange={(event) => setCustomLinkLabel(event.target.value)}
-                placeholder="表示名"
-                className="mb-2 w-full rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
-              />
-              <input
-                value={customLinkUrl}
-                onChange={(event) => setCustomLinkUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addCustomLink();
-                }}
-                placeholder="https://..."
-                className="mb-2 w-full rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
-              />
-              <button onClick={addCustomLink} className={`${topButtonClass} w-full`}>
-                追加
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
       <header className="flex min-h-[70px] flex-wrap items-center justify-between gap-3 border-b border-[var(--td-border)] px-6 py-3">
         <div>
           <h1 className="text-[20px] font-bold leading-tight">
@@ -2029,13 +1991,16 @@ export default function Home() {
                       const isCustom = index >= defaultQuickLinks.length;
                       return (
                         <div key={`${link.label}-${link.url}-${index}`} className="flex items-center gap-1">
-                          <button
-                            type="button"
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className={`${topButtonClass} flex-1 text-center no-underline`}
-                            onClick={(event) => openQuickLink(event, link.url)}
+                            style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                            onClick={(event) => { event.stopPropagation(); window.setTimeout(() => setOpenTopMenu(null), 300); }}
                           >
                             {link.label}
-                          </button>
+                          </a>
                           {isCustom && (
                             <button
                               onClick={() => removeCustomLink(index - defaultQuickLinks.length)}
@@ -2416,7 +2381,6 @@ export default function Home() {
             <button onClick={() => setExpandedEditor("input")} className={topButtonClass}>Input編集</button>
             <button onClick={openMemoEditor} className={topButtonClass}>メモ編集</button>
             <button onClick={() => setShowShortcutHelp(true)} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>使い方</button>
-            <button onClick={() => setOpenTopMenu((v) => (v === "resources" ? null : "resources"))} className={topButtonClass}>リンク</button>
             <button onClick={() => setShowTemplatePanel(true)} className={topButtonClass}>テンプレ</button>
             <button onClick={() => setThemeMode((mode) => nextThemeMode(mode))} className={topButtonClass}>テーマ: {themeLabel(themeMode)}</button>
             <button onClick={changePerspective} className={topButtonClass}>視点</button>
