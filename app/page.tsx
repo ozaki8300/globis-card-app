@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ChangeEvent as ReactChangeEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 
 type Area = "left" | "center" | "right";
@@ -69,6 +70,7 @@ const LEGACY_STORAGE_KEYS = ["thoughtdeck:v8", "thoughtdeck:v7", "thoughtdeck:v6
 const RESOURCES_STORAGE_KEY = "thoughtdeck:resources:v1";
 const LEGACY_CUSTOM_LINKS_STORAGE_KEY = "thoughtdeck:custom-links:v1";
 const MAX_URL_LENGTH = 3000;
+const QR_MAX_URL_LENGTH = 2900;
 const THOUGHTDECK_HOME_URL = "https://thought-deck.vercel.app/";
 
 const defaultQuickLinks = [
@@ -1453,7 +1455,7 @@ export default function Home() {
     const deck: DeckState = { raw, memo, output, addedCards, starred };
     const url = `${base}?d=${encodeURIComponent(encodeDeck(deck))}`;
     setShareUrl(url);
-    if (url.length > MAX_URL_LENGTH) {
+    if (url.length > QR_MAX_URL_LENGTH) {
       setQrError(
         `共有URLが長すぎます（${url.length}文字）。URLコピーは可能ですが、QR表示には向きません。`,
       );
@@ -1465,6 +1467,17 @@ export default function Home() {
       await navigator.clipboard.writeText(url);
     } catch {}
   };
+
+  useEffect(() => {
+    if (!showQr) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showQr]);
 
   const downloadMd = () => {
     const md = buildExportMarkdown(raw, addedCards, memo, output);
@@ -1998,7 +2011,7 @@ export default function Home() {
 
     const shortcuts = [
       ["F", "中央思考エリアをフォーカス"],
-      ["I", "Input編集"],
+      ["I", "Input表示／編集"],
       ["M", "メモ編集"],
       ["P", "投稿作成／編集"],
       ["D", "PDFを開く／表示／非表示（PCのみ）"],
@@ -2414,7 +2427,6 @@ export default function Home() {
                 <div className="absolute right-0 z-40 mt-2 w-[320px] rounded-xl border border-[var(--td-border)] bg-[var(--td-bg)] p-3 shadow-2xl">
                   <p className="mb-2 text-[10pt] text-[var(--td-muted)]">よく使う操作</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { openInputEditor(); setOpenTopMenu(null); }} className={topButtonClass}>Input編集</button>
                     <button onClick={() => { openMemoEditor(); setOpenTopMenu(null); }} className={topButtonClass}>メモ編集</button>
                     <button onClick={() => { togglePdf(); setOpenTopMenu(null); }} className={`${topButtonClass} ${pdfUrl ? "border-[var(--td-accent-border)] text-[var(--td-accent)]" : ""}`}>
                       {!pdfUrl ? "PDFを開く" : isPdfOpen ? "PDF非表示" : "PDF表示"}
@@ -2518,52 +2530,67 @@ export default function Home() {
         </div>
       </header>
 
-      {showQr && (
+      {showQr && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 text-slate-100 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex min-h-[100dvh] items-center justify-center overflow-hidden bg-black/70 px-4 py-6 text-slate-100 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setShowQr(false);
           }}
         >
-          <section className="flex max-h-[92vh] w-full max-w-[420px] flex-col items-center overflow-auto rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
-          <h2 className="mb-3 text-center text-[13pt] font-bold text-white">{title}</h2>
-          <p className="mb-4 text-center text-[11pt] text-slate-300">
-            QRまたはURLでDeckを共有
-          </p>
+          <section
+            className="flex max-h-[calc(100dvh-32px)] w-full max-w-[680px] flex-col items-center overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 p-4 shadow-2xl sm:p-6"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h2 className="mb-1 w-full truncate text-center text-[13pt] font-bold text-white sm:text-[16pt]">
+              {title}
+            </h2>
+            <p className="mb-4 text-center text-[10pt] text-slate-300 sm:text-[11pt]">
+              QRまたはURLでDeckを共有
+            </p>
 
-          {qrError ? (
-            <div className="mb-5 max-w-2xl rounded-xl border border-red-500/70 bg-red-950/70 p-4 text-[11pt] text-red-100 shadow-2xl">
-              {qrError}
+            {qrError ? (
+              <div className="mb-4 w-full max-w-[520px] rounded-xl border border-slate-600 bg-slate-900 p-4 text-center text-[10.5pt] font-semibold leading-7 text-slate-100 sm:text-[11pt]">
+                {qrError}
+              </div>
+            ) : (
+              <div className="w-[min(70vw,240px)] shrink-0 rounded-2xl bg-white p-3 shadow-2xl sm:w-[320px] md:w-[380px]">
+                <QRCodeSVG
+                  value={shareUrl}
+                  size={420}
+                  level="L"
+                  className="block h-auto w-full"
+                />
+              </div>
+            )}
+
+            <div className="mt-4 w-full max-w-[560px] rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-[8.5pt] leading-[1.25] text-slate-100 shadow-2xl sm:text-[9.5pt]">
+              <p className="max-h-[3.8em] overflow-hidden break-all">{shareUrl}</p>
             </div>
-          ) : (
-            <div className="rounded-2xl bg-white p-5 shadow-2xl">
-              <QRCodeSVG value={shareUrl} size={320} />
+
+            <div className="mt-4 grid w-full max-w-[560px] grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(shareUrl);
+                  setCopyStatus("URLをコピーしました");
+                }}
+                className="min-h-10 rounded-lg border border-slate-500/80 bg-slate-900 px-3 py-2 text-[10.5pt] text-white transition hover:border-slate-200 hover:bg-slate-800 sm:text-[11pt]"
+              >
+                URLコピー
+              </button>
+              <button
+                onClick={() => setShowQr(false)}
+                className="min-h-10 rounded-lg border border-slate-500/80 bg-slate-900 px-3 py-2 text-[10.5pt] text-white transition hover:border-slate-200 hover:bg-slate-800 sm:text-[11pt]"
+              >
+                閉じる
+              </button>
             </div>
-          )}
-
-          <textarea
-            value={shareUrl}
-            readOnly
-            className="mt-5 h-24 w-full resize-none rounded-xl border border-slate-300 bg-white p-3 text-[11pt] leading-[1.45] text-slate-900 outline-none shadow-2xl"
-          />
-
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={() => { navigator.clipboard.writeText(shareUrl); setCopyStatus("URLをコピーしました"); }}
-              className="rounded-lg border border-slate-500/80 bg-slate-900 px-4 py-2 text-[11pt] text-white transition hover:border-slate-200 hover:bg-slate-800"
-            >
-              URLコピー
-            </button>
-            <button
-              onClick={() => setShowQr(false)}
-              className="rounded-lg border border-slate-500/80 bg-slate-900 px-4 py-2 text-[11pt] text-white transition hover:border-slate-200 hover:bg-slate-800"
-            >
-              閉じる
-            </button>
-          </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
+
 
       <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible">
         {pdfSide === "left" && isPdfOpen && renderPdfPanel()}
@@ -2702,7 +2729,6 @@ export default function Home() {
               <div className="absolute bottom-12 right-0 z-50 w-[260px] rounded-2xl border border-[var(--td-border)] bg-[var(--td-bg)] p-3 shadow-2xl">
                 <p className="mb-2 text-[10pt] text-[var(--td-muted)]">スマホでは補助機能をここに集約</p>
                 <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { openInputEditor(); setOpenTopMenu(null); }} className={topButtonClass}>Input編集</button>
                   <button onClick={() => { setShowLeft((v) => !v); setOpenTopMenu(null); }} className={topButtonClass}>{showLeft ? "Input非表示" : "Input表示"}</button>
                   <button onClick={() => { setShowShortcutHelp(true); setOpenTopMenu(null); }} className={topButtonClass}>使い方</button>
                   <button onClick={() => { setThemeMode((mode) => nextThemeMode(mode)); setOpenTopMenu(null); }} className={topButtonClass}>テーマ</button>
