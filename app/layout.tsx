@@ -15,8 +15,10 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "ThoughtDeck",
   description: "Think. Deck. Share.",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.svg",
+    apple: "/icon-192.png",
   },
 };
 
