@@ -868,22 +868,29 @@ export default function Home() {
   const openOutputComposer = () => {
     setSelectedCardId("td-output");
     setFocusMode(false);
-    if (pdfUrl) {
+
+    // PDFワークスペースへ切り替えるのは、PCでPDFが実際に表示中のときだけ。
+    // pdfUrl が残っているだけの状態やスマホでは、投稿エディタを通常モーダルで開く。
+    if (pdfUrl && isPdfOpen && !isMobileLike()) {
       setPdfWorkMode("output");
       setExpandedEditor(null);
       return;
     }
+
     setExpandedEditor("output");
   };
 
   const openMemoEditor = () => {
     setSelectedCardId("td-memo");
     setFocusMode(false);
-    if (pdfUrl) {
+
+    // PDFワークスペースへ切り替えるのは、PCでPDFが実際に表示中のときだけ。
+    if (pdfUrl && isPdfOpen && !isMobileLike()) {
       setPdfWorkMode("memo");
       setExpandedEditor(null);
       return;
     }
+
     setExpandedEditor("memo");
   };
 
@@ -900,13 +907,15 @@ export default function Home() {
   };
 
   const openInputEditor = () => {
-    if (pdfUrl) {
+    // PDFワークスペースへ切り替えるのは、PCでPDFが実際に表示中のときだけ。
+    if (pdfUrl && isPdfOpen && !isMobileLike()) {
       setPdfWorkMode("input");
       setSelectedCardId(null);
       setFocusMode(false);
       setExpandedEditor(null);
       return;
     }
+
     setExpandedEditor("input");
   };
 
