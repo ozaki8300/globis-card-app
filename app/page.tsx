@@ -79,7 +79,17 @@ const defaultQuickLinks = [
 type ResourceTemplate = { id: string; title: string; content: string };
 type ResourceState = { links: { label: string; url: string }[]; templates: ResourceTemplate[] };
 type ThemeMode = "auto" | "light" | "dark";
+type PdfSide = "left" | "right";
+type PdfWorkMode = "thought" | "input" | "memo" | "output";
 const THEME_STORAGE_KEY = "thoughtdeck:theme:v1";
+const PDF_VIEW_STORAGE_KEY = "thoughtdeck:pdf-view:v1";
+const PDF_MIN_WIDTH = 360;
+const PDF_DEFAULT_WIDTH = 760;
+const getPdfMaxWidth = () => {
+  if (typeof window === "undefined") return 1280;
+  return Math.max(980, Math.floor(window.innerWidth * 0.92));
+};
+const clampPdfWidth = (value: number) => Math.min(Math.max(value, PDF_MIN_WIDTH), getPdfMaxWidth());
 const themeLabel = (mode: ThemeMode) => mode === "auto" ? "自動" : mode === "light" ? "ライト" : "ダーク";
 const nextThemeMode = (mode: ThemeMode): ThemeMode => mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
 
@@ -112,14 +122,6 @@ const blankRaw = `# タイトル
 ### 見出し
 @area: left
 -
-
-### 見出し
-@area: center
-- 
-
-### 見出し
-@area: right
-- 
 
 ## まとめ
 - `;
@@ -786,6 +788,26 @@ function buildRestoreUrl(
   return `${base}?d=${encodeURIComponent(encodeDeck(deck))}`;
 }
 
+function getActiveAreaEntries(block: { left: Card[]; center: Card[]; right: Card[] }) {
+  return ([
+    ["left", block.left],
+    ["center", block.center],
+    ["right", block.right],
+  ] as const).filter(([, items]) => items.length > 0);
+}
+
+function getDynamicColumnClass(count: number) {
+  if (count <= 1) return "grid-cols-1";
+  if (count === 2) return "grid-cols-2";
+  return "grid-cols-3";
+}
+
+function getAreaPlaceholder(perspective: (typeof placeholderSets)[number], area: Area) {
+  if (area === "left") return perspective.left;
+  if (area === "center") return perspective.center;
+  return perspective.right;
+}
+
 function formatObsidianTimestamp(date = new Date()) {
   return date.toLocaleString("ja-JP", {
     year: "numeric",
@@ -844,12 +866,22 @@ export default function Home() {
   const openOutputComposer = () => {
     setSelectedCardId("td-output");
     setFocusMode(false);
+    if (pdfUrl) {
+      setPdfWorkMode("output");
+      setExpandedEditor(null);
+      return;
+    }
     setExpandedEditor("output");
   };
 
   const openMemoEditor = () => {
     setSelectedCardId("td-memo");
     setFocusMode(false);
+    if (pdfUrl) {
+      setPdfWorkMode("memo");
+      setExpandedEditor(null);
+      return;
+    }
     setExpandedEditor("memo");
   };
 
@@ -863,6 +895,17 @@ export default function Home() {
 
   const changePerspective = () => {
     setPerspectiveIndex((prev) => (prev + 1) % placeholderSets.length);
+  };
+
+  const openInputEditor = () => {
+    if (pdfUrl) {
+      setPdfWorkMode("input");
+      setSelectedCardId(null);
+      setFocusMode(false);
+      setExpandedEditor(null);
+      return;
+    }
+    setExpandedEditor("input");
   };
 
   const [showLeft, setShowLeft] = useState(true);
@@ -888,6 +931,15 @@ export default function Home() {
   const [rightWidth, setRightWidth] = useState(390);
   const [draggingLeft, setDraggingLeft] = useState(false);
   const [draggingRight, setDraggingRight] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement | null>(null);
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [pdfFileName, setPdfFileName] = useState("");
+  const [isPdfOpen, setIsPdfOpen] = useState(false);
+  const [pdfSide, setPdfSide] = useState<PdfSide>("left");
+  const [pdfWidth, setPdfWidth] = useState(PDF_DEFAULT_WIDTH);
+  const [pdfPage, setPdfPage] = useState(1);
+  const [pdfWorkMode, setPdfWorkMode] = useState<PdfWorkMode>("thought");
+  const [draggingPdf, setDraggingPdf] = useState(false);
 
   const parsedDeck = useMemo(() => parseDeck(raw), [raw]);
   const { title, topSections, bottomSections } = parsedDeck;
@@ -1121,8 +1173,36 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    try {
+      const savedPdfView = localStorage.getItem(PDF_VIEW_STORAGE_KEY);
+      if (!savedPdfView) return;
+      const config = JSON.parse(savedPdfView) as Partial<{ side: PdfSide; width: number; page: number; workMode: PdfWorkMode; isOpen: boolean }>;
+      if (config.side === "left" || config.side === "right") setPdfSide(config.side);
+      if (typeof config.width === "number") setPdfWidth(clampPdfWidth(config.width));
+      if (typeof config.page === "number") setPdfPage(Math.max(1, Math.floor(config.page)));
+      if (config.workMode === "thought" || config.workMode === "input" || config.workMode === "memo" || config.workMode === "output") setPdfWorkMode(config.workMode);
+      if (typeof config.isOpen === "boolean") setIsPdfOpen(config.isOpen);
+    } catch {
+      localStorage.removeItem(PDF_VIEW_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      PDF_VIEW_STORAGE_KEY,
+      JSON.stringify({ side: pdfSide, width: pdfWidth, page: pdfPage, workMode: pdfWorkMode, isOpen: isPdfOpen }),
+    );
+  }, [pdfSide, pdfWidth, pdfPage, pdfWorkMode, isPdfOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -1168,6 +1248,17 @@ export default function Home() {
 
       if (isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
 
+      if (event.key.toLowerCase() === "d") {
+        if (isMobileLike()) return;
+        event.preventDefault();
+        if (event.shiftKey) {
+          clearPdf();
+        } else {
+          togglePdf();
+        }
+        return;
+      }
+
       if (event.key === "1") {
         event.preventDefault();
         moveCardToArea(selectedCardId, "left");
@@ -1201,7 +1292,7 @@ export default function Home() {
 
       if (event.key.toLowerCase() === "i") {
         event.preventDefault();
-        setExpandedEditor("input");
+        openInputEditor();
         showShortcutHint("Inputを編集します");
         return;
       }
@@ -1249,6 +1340,8 @@ export default function Home() {
     showShortcutHelp,
     showTemplatePanel,
     openTopMenu,
+    pdfUrl,
+    isPdfOpen,
   ]);
 
   useEffect(() => {
@@ -1278,6 +1371,80 @@ export default function Home() {
       window.removeEventListener("mouseup", onUp);
     };
   }, [draggingRight]);
+
+  const updatePdfWidthFromClientX = (clientX: number) => {
+    const nextWidth = pdfSide === "left" ? clientX : window.innerWidth - clientX;
+    setPdfWidth(clampPdfWidth(nextWidth));
+  };
+
+  useEffect(() => {
+    if (!draggingPdf) return;
+
+    const onMove = (e: MouseEvent) => updatePdfWidthFromClientX(e.clientX);
+    const onUp = () => setDraggingPdf(false);
+    const onBlur = () => setDraggingPdf(false);
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [draggingPdf, pdfSide]);
+
+  const openPdfPicker = () => {
+    if (isMobileLike()) {
+      showShortcutHint("PDF表示はPCで利用できます");
+      return;
+    }
+    pdfInputRef.current?.click();
+  };
+
+  const handlePdfFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    const nextUrl = URL.createObjectURL(file);
+    setPdfUrl(nextUrl);
+    setPdfFileName(file.name);
+    setIsPdfOpen(true);
+    showShortcutHint("PDFを開きました");
+
+    event.target.value = "";
+  };
+
+  const hidePdf = () => {
+    if (!pdfUrl) return;
+    setIsPdfOpen(false);
+    setDraggingPdf(false);
+    showShortcutHint("PDFを非表示にしました");
+  };
+
+  const clearPdf = () => {
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl("");
+    setPdfFileName("");
+    setIsPdfOpen(false);
+    setDraggingPdf(false);
+    showShortcutHint("PDFを解除しました");
+  };
+
+  const togglePdf = () => {
+    if (!pdfUrl) {
+      openPdfPicker();
+      return;
+    }
+
+    setIsPdfOpen((prev) => {
+      const next = !prev;
+      showShortcutHint(next ? "PDFを表示しました" : "PDFを非表示にしました");
+      return next;
+    });
+  };
 
   const createShare = async () => {
     const base = `${window.location.origin}${window.location.pathname}`;
@@ -1515,34 +1682,229 @@ export default function Home() {
 
     if (!hasCards) return null;
 
+    const activeAreas = getActiveAreaEntries(block);
+    const columnClass = getDynamicColumnClass(activeAreas.length);
+
     return (
       <div
         key={block.visualGroup}
         className={index === 0 ? "" : "mt-12 pt-2"}
       >
-        <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-1">
-          <div className="space-y-2">
-            {perspective.left && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.left}</p>
-            )}
-            {renderColumn(block.left, "left")}
-          </div>
+        <div className={`grid gap-4 ${columnClass} max-xl:grid-cols-1`}>
+          {activeAreas.map(([area, items]) => {
+            const placeholder = getAreaPlaceholder(perspective, area);
 
-          <div className="space-y-2">
-            {perspective.center && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.center}</p>
-            )}
-            {renderColumn(block.center, "center")}
-          </div>
-
-          <div className="space-y-2">
-            {perspective.right && (
-              <p className={`${mutedQuestionClass} px-1`}>{perspective.right}</p>
-            )}
-            {renderColumn(block.right, "right")}
-          </div>
+            return (
+              <div key={area} className="space-y-2">
+                {placeholder && (
+                  <p className={`${mutedQuestionClass} px-1`}>{placeholder}</p>
+                )}
+                {renderColumn(items, area)}
+              </div>
+            );
+          })}
         </div>
       </div>
+    );
+  };
+
+  const renderPdfPanel = () => {
+    if (!pdfUrl || !isPdfOpen) return null;
+
+    const pdfFrameSrc = `${pdfUrl}#page=${pdfPage}`;
+
+    return (
+      <aside
+        className="hidden shrink-0 overflow-hidden border-[var(--td-border)] bg-[var(--td-panel)] lg:flex lg:w-[var(--pdf-width)] lg:flex-col"
+        style={{ "--pdf-width": `${pdfWidth}px` } as CSSProperties}
+      >
+        <div className="flex min-h-[58px] items-center justify-between gap-2 border-b border-[var(--td-border)] px-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-[10.5pt] font-bold text-[var(--td-text)]">
+              PDF
+              {pdfFileName ? <span className="ml-2 font-normal text-[var(--td-muted)]">{pdfFileName}</span> : null}
+            </p>
+            <p className="text-[9.5pt] text-[var(--td-muted)]">PDF本体は保存しません</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setPdfSide("left")}
+              className={`${panelButtonClass} ${pdfSide === "left" ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+              title="PDFを左に表示"
+            >
+              左
+            </button>
+            <button
+              onClick={() => setPdfSide("right")}
+              className={`${panelButtonClass} ${pdfSide === "right" ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+              title="PDFを右に表示"
+            >
+              右
+            </button>
+            <button onClick={hidePdf} className={panelButtonClass}>
+              非表示
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--td-border)] px-3 py-2">
+          <label className="flex items-center gap-2 text-[10.5pt] text-[var(--td-muted)]">
+            ページ
+            <input
+              type="number"
+              min={1}
+              value={pdfPage}
+              onChange={(event) => setPdfPage(Math.max(1, Number(event.target.value) || 1))}
+              className="w-20 rounded-lg border border-[var(--td-border)] bg-[var(--td-editor)] px-2 py-1 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-[var(--td-accent-border)]"
+            />
+          </label>
+          <div className="flex items-center gap-1">
+            <button onClick={openPdfPicker} className={panelButtonClass}>
+              PDF変更
+            </button>
+            <button onClick={clearPdf} className={panelButtonClass}>
+              PDF解除
+            </button>
+          </div>
+        </div>
+
+        <iframe
+          key={`${pdfUrl}-${pdfPage}`}
+          src={pdfFrameSrc}
+          className={`min-h-0 flex-1 bg-white ${draggingPdf ? "pointer-events-none" : ""}`}
+          title="ThoughtDeck PDF Viewer"
+        />
+      </aside>
+    );
+  };
+
+  const renderPdfDivider = () => {
+    if (!pdfUrl || !isPdfOpen) return null;
+
+    return (
+      <div
+        onMouseDown={(event) => {
+          event.preventDefault();
+          setDraggingPdf(true);
+        }}
+        title="ドラッグしてPDF幅を調整"
+        className={`group hidden w-3 shrink-0 cursor-col-resize items-stretch justify-center bg-transparent transition lg:flex ${
+          draggingPdf ? "bg-[var(--td-hover)]" : "hover:bg-[var(--td-hover)]"
+        }`}
+      >
+        <div
+          className={`h-full w-[2px] transition ${
+            draggingPdf ? "bg-[var(--td-accent)]" : "bg-[var(--td-border)] group-hover:bg-[var(--td-accent-border)]"
+          }`}
+        />
+      </div>
+    );
+  };
+
+
+  const renderThoughtArea = () => (
+    <section className="no-scrollbar flex-1 overflow-auto p-4 max-lg:overflow-visible max-lg:p-4">
+      <div className="mb-5 rounded-xl border border-[var(--td-border)] bg-[var(--td-panel)] p-5">
+        <p className="text-[11pt] text-[var(--td-muted)]">タイトル</p>
+        <h2 className="text-xl font-bold">{title}</h2>
+      </div>
+
+      {topSections.length > 0 && (
+        <div className="mb-5 space-y-4">
+          {topSections.map(renderOneColumnSection)}
+        </div>
+      )}
+
+      <div>{cardBlocks.map((block, index) => renderCardBlock(block, index))}</div>
+
+      {bottomSections.length > 0 && (
+        <div className="mt-5 border-t border-[var(--td-border)] pt-4">
+          <div className="mb-2 px-1 text-[10.5pt] text-[var(--td-muted)]">結論</div>
+          <div className="space-y-4">{bottomSections.map(renderOneColumnSection)}</div>
+        </div>
+      )}
+
+      {output.trim() && (
+        <div className="mt-8 border-t border-[var(--td-border)] pt-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10.5pt] text-[var(--td-muted)]">OUTPUT</p>
+              <h2 className="text-[13pt] font-bold text-[var(--td-text)]">投稿文</h2>
+            </div>
+            <button onClick={openOutputComposer} className="rounded-lg border border-[var(--td-border)] px-3 py-1.5 text-[10.5pt] text-[var(--td-muted)] transition hover:border-[var(--td-accent-border)] hover:bg-[var(--td-accent-bg)] hover:text-[var(--td-accent)]">
+              編集
+            </button>
+          </div>
+          <section
+            onClick={() => setSelectedCardId("td-output")}
+            className={`cursor-pointer rounded-xl border p-4 text-[11pt] leading-6 text-[var(--td-text)] transition ${
+              selectedCardId === "td-output"
+                ? selectedThoughtClass
+                : "border-[var(--td-border)] bg-[var(--td-surface-soft)] hover:border-[var(--td-border-strong)]"
+            }`}
+          >
+            {renderMarkdownBlocks(output)}
+          </section>
+        </div>
+      )}
+    </section>
+  );
+
+  const pdfModeButtonClass = (mode: PdfWorkMode) =>
+    `rounded-lg border px-3 py-1.5 text-[10.5pt] transition ${
+      pdfWorkMode === mode
+        ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]"
+        : "border-[var(--td-border-strong)] text-[var(--td-text-soft)] hover:border-[var(--td-accent-border)] hover:bg-[var(--td-hover)] hover:text-[var(--td-text)]"
+    }`;
+
+  const renderPdfWorkspace = () => {
+    const editorTitle =
+      pdfWorkMode === "input" ? "インプット" : pdfWorkMode === "memo" ? "メモ" : "投稿文";
+    const editorValue = pdfWorkMode === "input" ? raw : pdfWorkMode === "memo" ? memo : output;
+    const setEditorValue = pdfWorkMode === "input" ? setRaw : pdfWorkMode === "memo" ? setMemo : setOutput;
+    const editorPlaceholder =
+      pdfWorkMode === "input"
+        ? "PDFを見ながら、構造化する内容を書きます..."
+        : pdfWorkMode === "memo"
+          ? "PDFを見ながら、気づき・違和感・発言メモを自由に書きます..."
+          : "PDFとカードを見ながら、投稿文を書きます...";
+
+    return (
+      <section className="no-scrollbar flex min-w-0 flex-1 flex-col overflow-hidden bg-[var(--td-bg)]">
+        <div className="flex min-h-[54px] flex-wrap items-center justify-between gap-3 border-b border-[var(--td-border)] px-4 py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10.5pt] text-[var(--td-muted)]">表示</span>
+            <button onClick={() => setPdfWorkMode("thought")} className={pdfModeButtonClass("thought")}>思考</button>
+            <button onClick={() => setPdfWorkMode("input")} className={pdfModeButtonClass("input")}>Input</button>
+            <button onClick={() => setPdfWorkMode("memo")} className={pdfModeButtonClass("memo")}>メモ</button>
+            <button onClick={() => setPdfWorkMode("output")} className={pdfModeButtonClass("output")}>投稿</button>
+          </div>
+          <p className="text-[10pt] text-[var(--td-muted)]">PDF表示中は、右側を作業モードに切り替えます</p>
+        </div>
+
+        {pdfWorkMode === "thought" ? (
+          renderThoughtArea()
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10.5pt] text-[var(--td-muted)]">PDFを見ながら書く</p>
+                <h2 className="text-[14pt] font-bold text-[var(--td-text)]">{editorTitle}</h2>
+              </div>
+              <span className="text-[10.5pt] text-[var(--td-muted)]">文字数：{editorValue.length}</span>
+            </div>
+            <textarea
+              autoFocus
+              value={editorValue}
+              onChange={(event) => setEditorValue(event.target.value)}
+              placeholder={editorPlaceholder}
+              className={`no-scrollbar min-h-0 flex-1 resize-none rounded-2xl border border-[var(--td-border-strong)] bg-[var(--td-editor)] p-5 text-[var(--td-text)] outline-none focus:border-[var(--td-accent-border)] ${
+                pdfWorkMode === "input" ? "font-mono text-[11.5pt] leading-7" : "text-[12.5pt] leading-8"
+              }`}
+            />
+          </div>
+        )}
+      </section>
     );
   };
 
@@ -1634,6 +1996,8 @@ export default function Home() {
       ["I", "Input編集"],
       ["M", "メモ編集"],
       ["P", "投稿作成／編集"],
+      ["D", "PDFを開く／表示／非表示（PCのみ）"],
+      ["Shift + D", "PDFを解除（PCのみ）"],
       ["1 / 2 / 3", "選択カードを 左 / 中 / 右 へ移動"],
       ["↑ ↓ ← →", "カード選択を移動"],
       ["S", "選択カードに★を付ける／外す"],
@@ -1930,6 +2294,25 @@ export default function Home() {
         </div>
       )}
 
+      {draggingPdf && (
+        <div
+          className="fixed inset-0 z-[70] cursor-col-resize bg-transparent"
+          style={{ userSelect: "none" }}
+          onMouseMove={(event) => updatePdfWidthFromClientX(event.clientX)}
+          onMouseUp={() => setDraggingPdf(false)}
+          onMouseLeave={() => setDraggingPdf(false)}
+          title="ドラッグしてPDF幅を調整"
+        />
+      )}
+
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf"
+        className="hidden"
+        onChange={handlePdfFileChange}
+      />
+
       <header className="flex min-h-[70px] flex-wrap items-center justify-between gap-3 border-b border-[var(--td-border)] px-6 py-3">
         <div>
           <h1 className="text-[20px] font-bold leading-tight">
@@ -1955,11 +2338,14 @@ export default function Home() {
             <button onClick={openOutputComposer} className={topButtonClass}>
               投稿作成
             </button>
-            <button onClick={() => setExpandedEditor("input")} className={topButtonClass}>
+            <button onClick={openInputEditor} className={topButtonClass}>
               Input編集
             </button>
             <button onClick={openMemoEditor} className={topButtonClass}>
               メモ編集
+            </button>
+            <button onClick={togglePdf} className={`${topButtonClass} ${pdfUrl ? "border-[var(--td-accent-border)] text-[var(--td-accent)]" : ""}`} title="D：PDFを開く／表示／非表示">
+              {!pdfUrl ? "PDFを開く" : isPdfOpen ? "PDF非表示" : "PDF表示"}
             </button>
             <button onClick={() => setShowShortcutHelp(true)} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>
               使い方
@@ -2148,237 +2534,96 @@ export default function Home() {
       )}
 
       <div className="flex h-[calc(100vh-70px)] overflow-hidden max-lg:h-auto max-lg:flex-col max-lg:overflow-visible">
-        {showLeft && (
+        {pdfSide === "left" && isPdfOpen && renderPdfPanel()}
+        {pdfSide === "left" && isPdfOpen && renderPdfDivider()}
+
+        {pdfUrl && isPdfOpen ? (
+          renderPdfWorkspace()
+        ) : (
           <>
-            <aside
-              className="no-scrollbar w-full shrink-0 overflow-auto border-r border-[var(--td-border)] p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]"
-              style={{ "--left-width": `${leftWidth}px` } as CSSProperties}
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-[var(--td-text)]">
-                  インプット
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setExpandedEditor("input")}
-                    className={panelButtonClass}
-                  >
-                    編集
-                  </button>
-                  <button
-                    onClick={() => setShowLeft(false)}
-                    className={panelButtonClass}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
+            {showLeft && (
+              <>
+                <aside
+                  className="no-scrollbar w-full shrink-0 overflow-auto border-r border-[var(--td-border)] p-5 max-lg:border-b max-lg:border-r-0 lg:w-[var(--left-width)]"
+                  style={{ "--left-width": `${leftWidth}px` } as CSSProperties}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-[13pt] font-bold text-[var(--td-text)]">インプット</h2>
+                    <div className="flex items-center gap-2">
+                      <button onClick={openInputEditor} className={panelButtonClass}>編集</button>
+                      <button onClick={() => setShowLeft(false)} className={panelButtonClass}>閉じる</button>
+                    </div>
+                  </div>
 
-              <div className="mb-3 grid grid-cols-5 gap-2">
-                <button
-                  onClick={() => insertTemplate("top")}
-                  className={insertButtonClass}
-                  title="上部1カラムを追加"
-                >
-                  ＋上
-                </button>
-                <button
-                  onClick={() => insertTemplate("left")}
-                  className={insertButtonClass}
-                  title="左カードを追加"
-                >
-                  ＋左
-                </button>
-                <button
-                  onClick={() => insertTemplate("center")}
-                  className={insertButtonClass}
-                  title="中央カードを追加"
-                >
-                  ＋中
-                </button>
-                <button
-                  onClick={() => insertTemplate("right")}
-                  className={insertButtonClass}
-                  title="右カードを追加"
-                >
-                  ＋右
-                </button>
-                <button
-                  onClick={() => insertTemplate("bottom")}
-                  className={insertButtonClass}
-                  title="下部1カラムを追加"
-                >
-                  ＋下
-                </button>
-              </div>
+                  <div className="mb-3 grid grid-cols-5 gap-2">
+                    <button onClick={() => insertTemplate("top")} className={insertButtonClass} title="上部1カラムを追加">＋上</button>
+                    <button onClick={() => insertTemplate("left")} className={insertButtonClass} title="左カードを追加">＋左</button>
+                    <button onClick={() => insertTemplate("center")} className={insertButtonClass} title="中央カードを追加">＋中</button>
+                    <button onClick={() => insertTemplate("right")} className={insertButtonClass} title="右カードを追加">＋右</button>
+                    <button onClick={() => insertTemplate("bottom")} className={insertButtonClass} title="下部1カラムを追加">＋下</button>
+                  </div>
 
-              <textarea
-                value={raw}
-                onChange={(e) => setRaw(e.target.value)}
-                placeholder="ここにInputを書きます..."
-                className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-[var(--td-border-strong)] bg-[var(--td-panel)] p-4 font-mono text-[11pt] leading-6 outline-none focus:border-[var(--td-border-strong)] max-lg:h-[42vh]"
-              />
-            </aside>
-            <div
-              onMouseDown={() => setDraggingLeft(true)}
-              className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden"
-            />
+                  <textarea
+                    value={raw}
+                    onChange={(e) => setRaw(e.target.value)}
+                    placeholder="ここにInputを書きます..."
+                    className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-[var(--td-border-strong)] bg-[var(--td-panel)] p-4 font-mono text-[11pt] leading-6 outline-none focus:border-[var(--td-border-strong)] max-lg:h-[42vh]"
+                  />
+                </aside>
+                <div onMouseDown={() => setDraggingLeft(true)} className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden" />
+              </>
+            )}
+
+            {!showLeft && (
+              <button onClick={() => setShowLeft(true)} className="hidden w-9 shrink-0 border-r border-[var(--td-border)] bg-[var(--td-panel)] text-[11pt] text-[var(--td-text)] hover:bg-[var(--td-hover)] lg:block" title="Inputを開く">▶</button>
+            )}
+
+            {renderThoughtArea()}
+
+            {!showRight && (
+              <button onClick={() => setShowRight(true)} className="hidden w-9 shrink-0 border-l border-[var(--td-border)] bg-[var(--td-panel)] text-[11pt] text-[var(--td-text)] hover:bg-[var(--td-hover)] lg:block" title="Memoを開く">◀</button>
+            )}
+
+            {showRight && (
+              <>
+                <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden" />
+                <aside
+                  className="no-scrollbar w-full shrink-0 overflow-auto border-l border-[var(--td-border)] p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]"
+                  style={{ "--right-width": `${rightWidth}px` } as CSSProperties}
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-[13pt] font-bold text-[var(--td-text)]">メモ</h2>
+                    <div className="flex items-center gap-2">
+                      <button onClick={openMemoEditor} className={panelButtonClass}>編集</button>
+                      <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
+                    </div>
+                  </div>
+                  <section
+                    onClick={() => setSelectedCardId("td-memo")}
+                    className={`no-scrollbar h-[calc(100vh-150px)] w-full cursor-pointer overflow-auto rounded-xl border p-4 text-[11pt] leading-6 text-[var(--td-text)] transition max-lg:h-[34vh] ${
+                      selectedCardId === "td-memo"
+                        ? selectedThoughtClass
+                        : "border-[var(--td-border)] bg-[var(--td-surface-soft)] hover:border-[var(--td-border-strong)]"
+                    }`}
+                  >
+                    {renderMarkdownBlocks(memo, "編集ボタンから、授業中の気づき・違和感・発言メモを自由に書きます。")}
+                  </section>
+                  <p className="mt-2 text-right text-[11pt] text-[var(--td-muted)]">文字数：{memo.length}</p>
+                </aside>
+              </>
+            )}
           </>
         )}
 
-        {!showLeft && (
-          <button
-            onClick={() => setShowLeft(true)}
-            className="hidden w-9 shrink-0 border-r border-[var(--td-border)] bg-[var(--td-panel)] text-[11pt] text-[var(--td-text)] hover:bg-[var(--td-hover)] lg:block"
-            title="Inputを開く"
-          >
-            ▶
-          </button>
-        )}
-
-        <section className="no-scrollbar flex-1 overflow-auto p-4 max-lg:overflow-visible max-lg:p-4">
-          <div className="mb-5 rounded-xl border border-[var(--td-border)] bg-[var(--td-panel)] p-5">
-            <p className="text-[11pt] text-[var(--td-muted)]">タイトル</p>
-            <h2 className="text-xl font-bold">{title}</h2>
-          </div>
-
-          {topSections.length > 0 && (
-            <div className="mb-5 space-y-4">
-              {topSections.map(renderOneColumnSection)}
-            </div>
-          )}
-
-          <div>
-            {cardBlocks.map((block, index) => renderCardBlock(block, index))}
-          </div>
-
-          {bottomSections.length > 0 && (
-            <div className="mt-5 border-t border-[var(--td-border)] pt-4">
-              <div className="mb-2 px-1 text-[10.5pt] text-[var(--td-muted)]">
-                結論
-              </div>
-              <div className="space-y-4">
-                {bottomSections.map((section) => {
-                  const isSelected = selectedCardId === section.id;
-
-                  return (
-                    <section
-                      key={section.id}
-                      onClick={() => setSelectedCardId(section.id)}
-                      className={`cursor-pointer rounded-xl border p-4 transition ${
-                        isSelected
-                          ? selectedThoughtClass
-                          : "border-[var(--td-border-strong)] bg-[var(--td-panel)] hover:border-blue-500/40 hover:bg-[var(--td-hover)]"
-                      }`}
-                    >
-                      <h3 className="mb-2 text-[12pt] font-bold text-[var(--td-accent)]">
-                        {section.title}
-                      </h3>
-
-                      <div className="text-[11pt] leading-5 text-[var(--td-text)]">
-                        {renderMarkdownBlocks(section.lines.join("\n"))}
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {output.trim() && (
-            <div className="mt-8 border-t border-[var(--td-border)] pt-5">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10.5pt] text-[var(--td-muted)]">OUTPUT</p>
-                  <h2 className="text-[13pt] font-bold text-[var(--td-text)]">投稿文</h2>
-                </div>
-                <button
-                  onClick={openOutputComposer}
-                  className="rounded-lg border border-[var(--td-border)] px-3 py-1.5 text-[10.5pt] text-[var(--td-muted)] transition hover:border-[var(--td-accent-border)] hover:bg-[var(--td-accent-bg)] hover:text-[var(--td-accent)]"
-                  title="投稿文を編集"
-                >
-                  編集
-                </button>
-              </div>
-              <section
-                onClick={() => setSelectedCardId("td-output")}
-                className={`cursor-pointer rounded-xl border p-4 text-[11pt] leading-6 text-[var(--td-text)] transition ${
-                  selectedCardId === "td-output"
-                    ? selectedThoughtClass
-                    : "border-[var(--td-border)] bg-[var(--td-surface-soft)] hover:border-[var(--td-border-strong)]"
-                }`}
-              >
-                {renderMarkdownBlocks(output)}
-              </section>
-            </div>
-          )}
-        </section>
-
-        {!showRight && (
-          <button
-            onClick={() => setShowRight(true)}
-            className="hidden w-9 shrink-0 border-l border-[var(--td-border)] bg-[var(--td-panel)] text-[11pt] text-[var(--td-text)] hover:bg-[var(--td-hover)] lg:block"
-            title="Memoを開く"
-          >
-            ◀
-          </button>
-        )}
-
-        {showRight && (
-          <>
-            <div
-              onMouseDown={() => setDraggingRight(true)}
-              className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden"
-            />
-            <aside
-              className="no-scrollbar w-full shrink-0 overflow-auto border-l border-[var(--td-border)] p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]"
-              style={{ "--right-width": `${rightWidth}px` } as CSSProperties}
-            >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-[13pt] font-bold text-[var(--td-text)]">
-                  メモ
-                </h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={openMemoEditor}
-                    className={panelButtonClass}
-                  >
-                    編集
-                  </button>
-                  <button
-                    onClick={() => setShowRight(false)}
-                    className={panelButtonClass}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-              <section
-                onClick={() => setSelectedCardId("td-memo")}
-                className={`no-scrollbar h-[calc(100vh-150px)] w-full cursor-pointer overflow-auto rounded-xl border p-4 text-[11pt] leading-6 text-[var(--td-text)] transition max-lg:h-[34vh] ${
-                  selectedCardId === "td-memo"
-                    ? selectedThoughtClass
-                    : "border-[var(--td-border)] bg-[var(--td-surface-soft)] hover:border-[var(--td-border-strong)]"
-                }`}
-              >
-                {renderMarkdownBlocks(
-                  memo,
-                  "編集ボタンから、授業中の気づき・違和感・発言メモを自由に書きます。",
-                )}
-              </section>
-              <p className="mt-2 text-right text-[11pt] text-[var(--td-muted)]">
-                文字数：{memo.length}
-              </p>
-            </aside>
-          </>
-        )}
+        {pdfSide === "right" && isPdfOpen && renderPdfDivider()}
+        {pdfSide === "right" && isPdfOpen && renderPdfPanel()}
       </div>
 
       <footer className="border-t border-[var(--td-border)] bg-[var(--td-bg)] p-3 lg:hidden">
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
             <button onClick={openOutputComposer} className={topButtonClass}>投稿作成</button>
-            <button onClick={() => setExpandedEditor("input")} className={topButtonClass}>Input編集</button>
+            <button onClick={openInputEditor} className={topButtonClass}>Input編集</button>
             <button onClick={openMemoEditor} className={topButtonClass}>メモ編集</button>
             <button onClick={() => setShowShortcutHelp(true)} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>使い方</button>
             <button onClick={() => setShowTemplatePanel(true)} className={topButtonClass}>テンプレ</button>
