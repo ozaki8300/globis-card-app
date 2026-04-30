@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ChangeEvent as ReactChangeEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -1014,7 +1014,7 @@ export default function Home() {
     return window.innerWidth < 768 || window.matchMedia?.("(pointer: coarse)").matches;
   };
 
-  const handleResourceLinkClick = async (event: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+  const handleResourceLinkClick = async (event: ReactMouseEvent<HTMLAnchorElement>, url: string) => {
     event.stopPropagation();
 
     if (isMobileLike()) {
@@ -1213,9 +1213,10 @@ export default function Home() {
   }, [customLinks, templates]);
 
   useEffect(() => {
-    const onMouseDown = (event: MouseEvent) => {
+    const onMouseDown = (event: globalThis.MouseEvent) => {
       if (!openTopMenu) return;
       const target = event.target as Node;
+      if (target instanceof Element && target.closest("[data-td-menu-root]")) return;
       if (topMenuRef.current && !topMenuRef.current.contains(target)) {
         setOpenTopMenu(null);
       }
@@ -1347,7 +1348,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!draggingLeft) return;
-    const onMove = (e: MouseEvent) =>
+    const onMove = (e: globalThis.MouseEvent) =>
       setLeftWidth(Math.min(Math.max(e.clientX, 260), 680));
     const onUp = () => setDraggingLeft(false);
     window.addEventListener("mousemove", onMove);
@@ -1360,7 +1361,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!draggingRight) return;
-    const onMove = (e: MouseEvent) =>
+    const onMove = (e: globalThis.MouseEvent) =>
       setRightWidth(
         Math.min(Math.max(window.innerWidth - e.clientX, 260), 680),
       );
@@ -1381,7 +1382,7 @@ export default function Home() {
   useEffect(() => {
     if (!draggingPdf) return;
 
-    const onMove = (e: MouseEvent) => updatePdfWidthFromClientX(e.clientX);
+    const onMove = (e: globalThis.MouseEvent) => updatePdfWidthFromClientX(e.clientX);
     const onUp = () => setDraggingPdf(false);
     const onBlur = () => setDraggingPdf(false);
 
@@ -1404,7 +1405,7 @@ export default function Home() {
     pdfInputRef.current?.click();
   };
 
-  const handlePdfFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfFileChange = (event: ReactChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -2375,7 +2376,7 @@ export default function Home() {
             <span className="text-[11pt] text-[var(--td-text)]">{copyStatus}</span>
           )}
 
-          <div ref={topMenuRef} className="flex items-center gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
+          <div ref={topMenuRef} data-td-menu-root className="flex items-center gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
             <button
               onClick={openOutputComposer}
               className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}
@@ -2518,9 +2519,15 @@ export default function Home() {
       </header>
 
       {showQr && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/88 p-8 text-slate-100 backdrop-blur-sm">
-          <h2 className="mb-3 text-[13pt] font-bold text-white">{title}</h2>
-          <p className="mb-4 text-[11pt] text-slate-300">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4 text-slate-100 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowQr(false);
+          }}
+        >
+          <section className="flex max-h-[92vh] w-full max-w-[420px] flex-col items-center overflow-auto rounded-2xl border border-slate-700 bg-slate-950 p-5 shadow-2xl">
+          <h2 className="mb-3 text-center text-[13pt] font-bold text-white">{title}</h2>
+          <p className="mb-4 text-center text-[11pt] text-slate-300">
             QRまたはURLでDeckを共有
           </p>
 
@@ -2537,7 +2544,7 @@ export default function Home() {
           <textarea
             value={shareUrl}
             readOnly
-            className="mt-6 h-24 w-full max-w-3xl resize-none rounded-xl border border-slate-300 bg-white p-3 text-[11pt] leading-[1.45] text-slate-900 outline-none shadow-2xl"
+            className="mt-5 h-24 w-full resize-none rounded-xl border border-slate-300 bg-white p-3 text-[11pt] leading-[1.45] text-slate-900 outline-none shadow-2xl"
           />
 
           <div className="mt-4 flex gap-3">
@@ -2554,6 +2561,7 @@ export default function Home() {
               閉じる
             </button>
           </div>
+          </section>
         </div>
       )}
 
@@ -2655,30 +2663,62 @@ export default function Home() {
         {pdfSide === "right" && isPdfOpen && renderPdfPanel()}
       </div>
 
-      <footer className="border-t border-[var(--td-border)] bg-[var(--td-bg)] p-3 lg:hidden">
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
-            <button onClick={openOutputComposer} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>投稿作成</button>
-            <button onClick={() => setShowLeft((v) => !v)} className={`${topButtonClass} ${showLeft ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}>Input</button>
-            <button onClick={() => setShowRight((v) => !v)} className={`${topButtonClass} ${showRight ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}>メモ</button>
-            <button onClick={() => setShowShortcutHelp(true)} className={topButtonClass}>使い方</button>
-            <button onClick={() => setShowTemplatePanel(true)} className={topButtonClass}>テンプレ</button>
-            <button onClick={() => setThemeMode((mode) => nextThemeMode(mode))} className={topButtonClass}>テーマ: {themeLabel(themeMode)}</button>
-            <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
-            <button onClick={createShare} className={topButtonClass}>QR表示</button>
-            <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-1.5 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
-          </div>
+      <footer className="sticky bottom-0 z-30 border-t border-[var(--td-border)] bg-[var(--td-bg)] p-2 lg:hidden">
+        <div data-td-menu-root className="mx-auto flex max-w-md items-center justify-between gap-2 rounded-2xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1.5 shadow-2xl">
+          <button
+            onClick={openOutputComposer}
+            className={`${topButtonClass} flex-1 border-[var(--td-accent-border)] text-[var(--td-accent)]`}
+            title="投稿文を作成します"
+          >
+            投稿
+          </button>
 
-          <div className="text-[10pt] text-[var(--td-muted)]">
-            ThoughtDeck —{" "}
-            <a
-              href={THOUGHTDECK_HOME_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="underline underline-offset-2 hover:text-[var(--td-text-soft)]"
+          <button
+            onClick={() => setShowRight((v) => !v)}
+            className={`${topButtonClass} flex-1 ${showRight ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+            title="メモ欄を表示／非表示"
+          >
+            {showRight ? "▼ メモ" : "▶ メモ"}
+          </button>
+
+          <button
+            onClick={createShare}
+            className={`${topButtonClass} flex-1`}
+            title="QRを表示します"
+          >
+            QR
+          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setOpenTopMenu((v) => (v === "more" ? null : "more"))}
+              className={`${topButtonClass} min-w-11 px-3`}
+              title="その他の機能"
             >
-              thought-deck.vercel.app
-            </a>
+              ︙
+            </button>
+
+            {openTopMenu === "more" && (
+              <div className="absolute bottom-12 right-0 z-50 w-[260px] rounded-2xl border border-[var(--td-border)] bg-[var(--td-bg)] p-3 shadow-2xl">
+                <p className="mb-2 text-[10pt] text-[var(--td-muted)]">スマホでは補助機能をここに集約</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => { openInputEditor(); setOpenTopMenu(null); }} className={topButtonClass}>Input編集</button>
+                  <button onClick={() => { setShowLeft((v) => !v); setOpenTopMenu(null); }} className={topButtonClass}>{showLeft ? "Input非表示" : "Input表示"}</button>
+                  <button onClick={() => { setShowShortcutHelp(true); setOpenTopMenu(null); }} className={topButtonClass}>使い方</button>
+                  <button onClick={() => { setThemeMode((mode) => nextThemeMode(mode)); setOpenTopMenu(null); }} className={topButtonClass}>テーマ</button>
+                  <button onClick={() => { downloadMd(); setOpenTopMenu(null); }} className={topButtonClass}>MD保存</button>
+                  <button onClick={() => { copyMd(); setOpenTopMenu(null); }} className={topButtonClass}>MDコピー</button>
+                  <button onClick={() => { saveToObsidian(); setOpenTopMenu(null); }} className={topButtonClass}>Obsidian</button>
+                  <button onClick={() => { setShowTemplatePanel(true); setOpenTopMenu(null); }} className={topButtonClass}>テンプレ</button>
+                </div>
+                <button
+                  onClick={() => { clearAll(); setOpenTopMenu(null); }}
+                  className="mt-2 w-full rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 hover:bg-red-950/40"
+                >
+                  クリア
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </footer>
