@@ -2575,7 +2575,6 @@ export default function Home() {
                     <h2 className="text-[13pt] font-bold text-[var(--td-text)]">インプット</h2>
                     <div className="flex items-center gap-2">
                       <button onClick={openInputEditor} className={panelButtonClass}>編集</button>
-                      <button onClick={() => setShowLeft(false)} className={panelButtonClass}>閉じる</button>
                     </div>
                   </div>
 
@@ -2594,6 +2593,13 @@ export default function Home() {
                     className="no-scrollbar h-[calc(100vh-205px)] w-full resize-none rounded-xl border border-[var(--td-border-strong)] bg-[var(--td-panel)] p-4 font-mono text-[11pt] leading-6 outline-none focus:border-[var(--td-border-strong)] max-lg:h-[42vh]"
                   />
                 </aside>
+                <button
+                  onClick={() => setShowLeft(false)}
+                  className="hidden w-9 shrink-0 border-r border-[var(--td-border)] bg-[var(--td-panel)] text-[12pt] text-[var(--td-text)] transition hover:bg-[var(--td-hover)] lg:block"
+                  title="Inputを閉じる"
+                >
+                  ◀
+                </button>
                 <div onMouseDown={() => setDraggingLeft(true)} className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden" />
               </>
             )}
@@ -2611,6 +2617,13 @@ export default function Home() {
             {showRight && (
               <>
                 <div onMouseDown={() => setDraggingRight(true)} className="w-1 cursor-col-resize bg-[var(--td-border)] hover:bg-neutral-500 max-lg:hidden" />
+                <button
+                  onClick={() => setShowRight(false)}
+                  className="hidden w-9 shrink-0 border-l border-[var(--td-border)] bg-[var(--td-panel)] text-[12pt] text-[var(--td-text)] transition hover:bg-[var(--td-hover)] lg:block"
+                  title="メモを閉じる"
+                >
+                  ▶
+                </button>
                 <aside
                   className="no-scrollbar w-full shrink-0 overflow-auto border-l border-[var(--td-border)] p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]"
                   style={{ "--right-width": `${rightWidth}px` } as CSSProperties}
@@ -2619,7 +2632,6 @@ export default function Home() {
                     <h2 className="text-[13pt] font-bold text-[var(--td-text)]">メモ</h2>
                     <div className="flex items-center gap-2">
                       <button onClick={openMemoEditor} className={panelButtonClass}>編集</button>
-                      <button onClick={() => setShowRight(false)} className={panelButtonClass}>閉じる</button>
                     </div>
                   </div>
                   <section
