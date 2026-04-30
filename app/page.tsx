@@ -81,7 +81,7 @@ type ResourceState = { links: { label: string; url: string }[]; templates: Resou
 type ThemeMode = "auto" | "light" | "dark";
 type PdfSide = "left" | "right";
 type PdfWorkMode = "thought" | "input" | "memo" | "output";
-const THEME_STORAGE_KEY = "thoughtdeck:theme:v1";
+const THEME_STORAGE_KEY = "thoughtdeck:theme:v2";
 const PDF_VIEW_STORAGE_KEY = "thoughtdeck:pdf-view:v1";
 const PDF_MIN_WIDTH = 360;
 const PDF_DEFAULT_WIDTH = 760;
@@ -908,14 +908,14 @@ export default function Home() {
     setExpandedEditor("input");
   };
 
-  const [showLeft, setShowLeft] = useState(true);
-  const [showRight, setShowRight] = useState(true);
+  const [showLeft, setShowLeft] = useState(false);
+  const [showRight, setShowRight] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [showTemplatePanel, setShowTemplatePanel] = useState(false);
-  const [openTopMenu, setOpenTopMenu] = useState<"display" | "export" | "resources" | "theme" | null>(null);
+  const [openTopMenu, setOpenTopMenu] = useState<"more" | "display" | "export" | "resources" | "theme" | null>(null);
   const topMenuRef = useRef<HTMLDivElement | null>(null);
-  const [themeMode, setThemeMode] = useState<ThemeMode>("auto");
+  const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
   const [customLinks, setCustomLinks] = useState<{ label: string; url: string }[]>([]);
   const [customLinkLabel, setCustomLinkLabel] = useState("");
   const [customLinkUrl, setCustomLinkUrl] = useState("");
@@ -1123,6 +1123,7 @@ export default function Home() {
         setAddedCards(decoded.addedCards || []);
         setStarred(decoded.starred || []);
         setShowLeft(false);
+        setShowRight(false);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(decoded));
         window.history.replaceState({}, "", window.location.pathname);
         return;
@@ -1506,6 +1507,8 @@ export default function Home() {
     setShowQr(false);
     setSelectedCardId(null);
     setFocusMode(false);
+    setShowLeft(false);
+    setShowRight(false);
     localStorage.removeItem(STORAGE_KEY);
   };
 
@@ -1521,6 +1524,7 @@ export default function Home() {
     setSelectedCardId(null);
     setFocusMode(false);
     setShowLeft(false);
+    setShowRight(false);
   };
 
   const confirmLoadDemo = () => {
@@ -2170,7 +2174,10 @@ export default function Home() {
     "rounded-lg border border-[var(--td-border-strong)] px-3 py-1.5 text-[11pt] text-[var(--td-text-soft)] transition hover:border-[var(--td-accent-border)] hover:bg-[var(--td-hover)] hover:text-[var(--td-text)]";
 
   return (
-    <main data-theme={themeMode} className="min-h-screen bg-[var(--td-bg)] text-[var(--td-text)] lg:h-screen lg:overflow-hidden">
+    <main data-theme={themeMode} className="td-app-enter min-h-screen bg-[var(--td-bg)] text-[var(--td-text)] lg:h-screen lg:overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none fixed left-0 top-0 z-[90] h-[2px] w-full overflow-hidden">
+        <div className="td-startup-scan h-full w-[34vw] rounded-full bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_18px_rgba(96,165,250,0.9)]" />
+      </div>
       {renderExpandedEditor()}
       {renderCentralFocus()}
       {renderShortcutHelp()}
@@ -2199,26 +2206,26 @@ export default function Home() {
           --td-mark-bg: rgba(37, 99, 235, 0.14);
         }
         main[data-theme="dark"] {
-          --td-bg: #0b0b10;
-          --td-panel: #14141a;
-          --td-surface: #181820;
-          --td-surface-soft: rgba(24, 24, 32, 0.74);
-          --td-editor: #171720;
-          --td-text: #f3f4f6;
-          --td-text-soft: #d1d5db;
-          --td-muted: #8b949e;
-          --td-border: rgba(255, 255, 255, 0.11);
-          --td-border-strong: rgba(255, 255, 255, 0.20);
-          --td-hover: rgba(199, 210, 254, 0.08);
-          --td-overlay: rgba(0, 0, 0, 0.78);
-          --td-card-bg: rgba(20, 20, 26, 0.62);
-          --td-card-border: rgba(255, 255, 255, 0.08);
-          --td-card-border-hover: rgba(199, 210, 254, 0.30);
-          --td-accent: #c7d2fe;
-          --td-accent-bg: rgba(199, 210, 254, 0.08);
-          --td-accent-border: rgba(199, 210, 254, 0.40);
-          --td-accent-shadow: rgba(199, 210, 254, 0.45);
-          --td-mark-bg: rgba(199, 210, 254, 0.22);
+          --td-bg: #0f172a;
+          --td-panel: #111827;
+          --td-surface: #162033;
+          --td-surface-soft: rgba(22, 32, 51, 0.74);
+          --td-editor: #111827;
+          --td-text: #e5e7eb;
+          --td-text-soft: #cbd5e1;
+          --td-muted: #94a3b8;
+          --td-border: rgba(148, 163, 184, 0.18);
+          --td-border-strong: rgba(148, 163, 184, 0.30);
+          --td-hover: rgba(37, 99, 235, 0.12);
+          --td-overlay: rgba(15, 23, 42, 0.78);
+          --td-card-bg: rgba(17, 24, 39, 0.72);
+          --td-card-border: rgba(148, 163, 184, 0.18);
+          --td-card-border-hover: rgba(96, 165, 250, 0.38);
+          --td-accent: #60a5fa;
+          --td-accent-bg: rgba(37, 99, 235, 0.14);
+          --td-accent-border: rgba(96, 165, 250, 0.46);
+          --td-accent-shadow: rgba(96, 165, 250, 0.48);
+          --td-mark-bg: rgba(37, 99, 235, 0.24);
         }
         main[data-theme="auto"] {
           --td-bg: #f8fafc;
@@ -2244,27 +2251,61 @@ export default function Home() {
         }
         @media (prefers-color-scheme: dark) {
           main[data-theme="auto"] {
-            --td-bg: #0b0b10;
-            --td-panel: #14141a;
-            --td-surface: #181820;
-            --td-surface-soft: rgba(24, 24, 32, 0.74);
-            --td-editor: #171720;
-            --td-text: #f3f4f6;
-            --td-text-soft: #d1d5db;
-            --td-muted: #8b949e;
-            --td-border: rgba(255, 255, 255, 0.11);
-            --td-border-strong: rgba(255, 255, 255, 0.20);
-            --td-hover: rgba(199, 210, 254, 0.08);
-            --td-overlay: rgba(0, 0, 0, 0.78);
-            --td-card-bg: rgba(20, 20, 26, 0.62);
-            --td-card-border: rgba(255, 255, 255, 0.08);
-            --td-card-border-hover: rgba(199, 210, 254, 0.30);
-            --td-accent: #c7d2fe;
-            --td-accent-bg: rgba(199, 210, 254, 0.08);
-            --td-accent-border: rgba(199, 210, 254, 0.40);
-            --td-accent-shadow: rgba(199, 210, 254, 0.45);
-            --td-mark-bg: rgba(199, 210, 254, 0.22);
+            --td-bg: #0f172a;
+            --td-panel: #111827;
+            --td-surface: #162033;
+            --td-surface-soft: rgba(22, 32, 51, 0.74);
+            --td-editor: #111827;
+            --td-text: #e5e7eb;
+            --td-text-soft: #cbd5e1;
+            --td-muted: #94a3b8;
+            --td-border: rgba(148, 163, 184, 0.18);
+            --td-border-strong: rgba(148, 163, 184, 0.30);
+            --td-hover: rgba(37, 99, 235, 0.12);
+            --td-overlay: rgba(15, 23, 42, 0.78);
+            --td-card-bg: rgba(17, 24, 39, 0.72);
+            --td-card-border: rgba(148, 163, 184, 0.18);
+            --td-card-border-hover: rgba(96, 165, 250, 0.38);
+            --td-accent: #60a5fa;
+            --td-accent-bg: rgba(37, 99, 235, 0.14);
+            --td-accent-border: rgba(96, 165, 250, 0.46);
+            --td-accent-shadow: rgba(96, 165, 250, 0.48);
+            --td-mark-bg: rgba(37, 99, 235, 0.24);
           }
+        }
+        @keyframes td-startup-scan {
+          0% {
+            transform: translateX(-40vw);
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          78% {
+            opacity: 0.9;
+          }
+          100% {
+            transform: translateX(120vw);
+            opacity: 0;
+          }
+        }
+        .td-startup-scan {
+          animation: td-startup-scan 1.15s ease-out 1 both;
+        }
+        @keyframes td-app-enter {
+          0% {
+            opacity: 0;
+            transform: translateY(6px);
+            filter: blur(2px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+            filter: blur(0);
+          }
+        }
+        .td-app-enter {
+          animation: td-app-enter 0.42s ease-out 1 both;
         }
         textarea, input {
           background: var(--td-editor) !important;
@@ -2335,155 +2376,138 @@ export default function Home() {
           )}
 
           <div ref={topMenuRef} className="flex items-center gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
-            <button onClick={openOutputComposer} className={topButtonClass}>
+            <button
+              onClick={openOutputComposer}
+              className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}
+              title="投稿文を作成します"
+            >
               投稿作成
             </button>
-            <button onClick={openInputEditor} className={topButtonClass}>
-              Input編集
-            </button>
-            <button onClick={openMemoEditor} className={topButtonClass}>
-              メモ編集
-            </button>
-            <button onClick={togglePdf} className={`${topButtonClass} ${pdfUrl ? "border-[var(--td-accent-border)] text-[var(--td-accent)]" : ""}`} title="D：PDFを開く／表示／非表示">
-              {!pdfUrl ? "PDFを開く" : isPdfOpen ? "PDF非表示" : "PDF表示"}
-            </button>
-            <button onClick={() => setShowShortcutHelp(true)} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>
-              使い方
+
+            <button
+              onClick={() => setShowLeft((v) => !v)}
+              className={`${topButtonClass} ${showLeft ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+              title="Input欄を表示／非表示"
+            >
+              Input
             </button>
 
-            <button onClick={changePerspective} className={topButtonClass}>
-              視点
-              <span className="ml-2 text-[var(--td-muted)]">{perspective.label}</span>
-            </button>
-            <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>
-              Input {showLeft ? "非表示" : "表示"}
-            </button>
-            <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>
-              メモ {showRight ? "非表示" : "表示"}
+            <button
+              onClick={() => setShowRight((v) => !v)}
+              className={`${topButtonClass} ${showRight ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+              title="メモ欄を表示／非表示"
+            >
+              メモ
             </button>
 
             <div className="relative">
               <button
-                onClick={() => setOpenTopMenu((v) => (v === "resources" ? null : "resources"))}
+                onClick={() => setOpenTopMenu((v) => (v === "more" ? null : "more"))}
                 className={topButtonClass}
+                title="その他の機能"
               >
-                リンク ▾
+                ︙
               </button>
-              {openTopMenu === "resources" && (
-                <div className="absolute right-0 z-40 mt-2 w-[260px] rounded-xl border border-[var(--td-border)] bg-[var(--td-bg)] p-2 shadow-2xl">
-                  <p className="mb-2 text-[10pt] text-[var(--td-muted)]">公式リンク / 追加リンク</p>
-                  <div className="flex flex-col gap-1">
-                    {allQuickLinks.map((link, index) => {
-                      const isCustom = index >= defaultQuickLinks.length;
-                      return (
-                        <div key={`${link.label}-${link.url}-${index}`} className="flex items-center gap-1">
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`${topButtonClass} flex-1 text-center no-underline`}
-                            style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
-                            onClick={(event) => { event.stopPropagation(); window.setTimeout(() => setOpenTopMenu(null), 300); }}
-                          >
-                            {link.label}
-                          </a>
-                          {isCustom && (
-                            <button
-                              onClick={() => removeCustomLink(index - defaultQuickLinks.length)}
-                              className="rounded-lg border border-[var(--td-border)] px-2 py-2 text-[10pt] text-[var(--td-muted)] hover:border-red-800 hover:text-red-400"
-                              title="削除"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
+
+              {openTopMenu === "more" && (
+                <div className="absolute right-0 z-40 mt-2 w-[320px] rounded-xl border border-[var(--td-border)] bg-[var(--td-bg)] p-3 shadow-2xl">
+                  <p className="mb-2 text-[10pt] text-[var(--td-muted)]">よく使う操作</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => { openInputEditor(); setOpenTopMenu(null); }} className={topButtonClass}>Input編集</button>
+                    <button onClick={() => { openMemoEditor(); setOpenTopMenu(null); }} className={topButtonClass}>メモ編集</button>
+                    <button onClick={() => { togglePdf(); setOpenTopMenu(null); }} className={`${topButtonClass} ${pdfUrl ? "border-[var(--td-accent-border)] text-[var(--td-accent)]" : ""}`}>
+                      {!pdfUrl ? "PDFを開く" : isPdfOpen ? "PDF非表示" : "PDF表示"}
+                    </button>
+                    <button onClick={() => { setShowShortcutHelp(true); setOpenTopMenu(null); }} className={topButtonClass}>使い方</button>
+                    <button onClick={() => { changePerspective(); setOpenTopMenu(null); }} className={topButtonClass}>視点: {perspective.label}</button>
+                    <button onClick={() => { setShowTemplatePanel(true); setOpenTopMenu(null); }} className={topButtonClass}>テンプレ</button>
                   </div>
 
                   <div className="mt-3 border-t border-[var(--td-border)] pt-3">
-                    <p className="mb-2 text-[10pt] text-[var(--td-muted)]">追加リンク</p>
-                    <input
-                      value={customLinkLabel}
-                      onChange={(event) => setCustomLinkLabel(event.target.value)}
-                      placeholder="表示名"
-                      className="mb-2 w-full rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
-                    />
-                    <input
-                      value={customLinkUrl}
-                      onChange={(event) => setCustomLinkUrl(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") addCustomLink();
-                      }}
-                      placeholder="https://..."
-                      className="mb-2 w-full rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
-                    />
-                    <button onClick={addCustomLink} className={`${topButtonClass} w-full`}>
-                      追加
-                    </button>
+                    <p className="mb-2 text-[10pt] text-[var(--td-muted)]">リンク</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {allQuickLinks.map((link, index) => {
+                        const isCustom = index >= defaultQuickLinks.length;
+                        return (
+                          <div key={`${link.label}-${link.url}-${index}`} className="flex min-w-0 items-center gap-1">
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`${topButtonClass} min-w-0 flex-1 truncate text-center no-underline`}
+                              style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+                              onClick={(event) => handleResourceLinkClick(event, link.url)}
+                            >
+                              {link.label}
+                            </a>
+                            {isCustom && (
+                              <button
+                                onClick={() => removeCustomLink(index - defaultQuickLinks.length)}
+                                className="rounded-lg border border-[var(--td-border)] px-2 py-2 text-[10pt] text-[var(--td-muted)] hover:border-red-800 hover:text-red-400"
+                                title="削除"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
+                      <input
+                        value={customLinkLabel}
+                        onChange={(event) => setCustomLinkLabel(event.target.value)}
+                        placeholder="表示名"
+                        className="min-w-0 rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
+                      />
+                      <input
+                        value={customLinkUrl}
+                        onChange={(event) => setCustomLinkUrl(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") addCustomLink();
+                        }}
+                        placeholder="https://..."
+                        className="min-w-0 rounded-lg border border-[var(--td-border)] bg-[var(--td-panel)] px-3 py-2 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-blue-500/50"
+                      />
+                      <button onClick={addCustomLink} className={topButtonClass}>追加</button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
 
-            <button onClick={() => setShowTemplatePanel(true)} className={topButtonClass}>
-              テンプレ
-            </button>
+                  <div className="mt-3 border-t border-[var(--td-border)] pt-3">
+                    <p className="mb-2 text-[10pt] text-[var(--td-muted)]">テーマ</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["auto", "light", "dark"] as ThemeMode[]).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => { setThemeMode(mode); setOpenTopMenu(null); }}
+                          className={`${topButtonClass} ${themeMode === mode ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
+                        >
+                          {themeLabel(mode)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-            <div className="relative">
-              <button
-                onClick={() => setOpenTopMenu((v) => (v === "theme" ? null : "theme"))}
-                className={topButtonClass}
-              >
-                テーマ: {themeLabel(themeMode)} ▾
-              </button>
-              {openTopMenu === "theme" && (
-                <div className="absolute right-0 z-40 mt-2 flex min-w-[160px] flex-col gap-1 rounded-xl border border-[var(--td-border)] bg-[var(--td-bg)] p-2 shadow-2xl">
-                  {(["auto", "light", "dark"] as ThemeMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => { setThemeMode(mode); setOpenTopMenu(null); }}
-                      className={`${topButtonClass} text-left ${themeMode === mode ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
-                    >
-                      {themeLabel(mode)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="relative">
-              <button
-                onClick={() => setOpenTopMenu((v) => (v === "export" ? null : "export"))}
-                className={topButtonClass}
-              >
-                エクスポート ▾
-              </button>
-              {openTopMenu === "export" && (
-                <div className="absolute right-0 z-40 mt-2 flex min-w-[190px] flex-col gap-1 rounded-xl border border-[var(--td-border)] bg-[var(--td-bg)] p-2 shadow-2xl">
-                  <button onClick={() => { downloadMd(); setOpenTopMenu(null); }} className={topButtonClass}>
-                    MD保存
-                  </button>
-                  <button onClick={() => { copyMd(); setOpenTopMenu(null); }} className={topButtonClass}>
-                    MDコピー
-                  </button>
-                  <button onClick={() => { saveToObsidian(); setOpenTopMenu(null); }} className={topButtonClass}>
-                    Obsidian保存
-                  </button>
-                  <button onClick={() => { createShare(); setOpenTopMenu(null); }} className={topButtonClass}>
-                    QR表示
-                  </button>
+                  <div className="mt-3 border-t border-[var(--td-border)] pt-3">
+                    <p className="mb-2 text-[10pt] text-[var(--td-muted)]">エクスポート</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => { downloadMd(); setOpenTopMenu(null); }} className={topButtonClass}>MD保存</button>
+                      <button onClick={() => { copyMd(); setOpenTopMenu(null); }} className={topButtonClass}>MDコピー</button>
+                      <button onClick={() => { saveToObsidian(); setOpenTopMenu(null); }} className={topButtonClass}>Obsidian保存</button>
+                      <button onClick={() => { createShare(); setOpenTopMenu(null); }} className={topButtonClass}>QR表示</button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
             <button
               onClick={clearAll}
-              className="rounded-lg border border-red-800 px-3 py-1.5 text-[11pt] text-red-400 transition hover:bg-red-950/40"
+              className="rounded-lg border border-red-800 px-3 py-2 text-[11pt] text-red-400 transition hover:bg-red-950/40"
             >
               クリア
             </button>
-
           </div>
         </div>
 
@@ -2622,18 +2646,13 @@ export default function Home() {
       <footer className="border-t border-[var(--td-border)] bg-[var(--td-bg)] p-3 lg:hidden">
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--td-border)] bg-[var(--td-surface)] p-1">
-            <button onClick={openOutputComposer} className={topButtonClass}>投稿作成</button>
-            <button onClick={openInputEditor} className={topButtonClass}>Input編集</button>
-            <button onClick={openMemoEditor} className={topButtonClass}>メモ編集</button>
-            <button onClick={() => setShowShortcutHelp(true)} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>使い方</button>
+            <button onClick={openOutputComposer} className={`${topButtonClass} border-[var(--td-accent-border)] text-[var(--td-accent)]`}>投稿作成</button>
+            <button onClick={() => setShowLeft((v) => !v)} className={`${topButtonClass} ${showLeft ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}>Input</button>
+            <button onClick={() => setShowRight((v) => !v)} className={`${topButtonClass} ${showRight ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}>メモ</button>
+            <button onClick={() => setShowShortcutHelp(true)} className={topButtonClass}>使い方</button>
             <button onClick={() => setShowTemplatePanel(true)} className={topButtonClass}>テンプレ</button>
             <button onClick={() => setThemeMode((mode) => nextThemeMode(mode))} className={topButtonClass}>テーマ: {themeLabel(themeMode)}</button>
-            <button onClick={changePerspective} className={topButtonClass}>視点</button>
-            <button onClick={() => setShowLeft((v) => !v)} className={topButtonClass}>Input {showLeft ? "非表示" : "表示"}</button>
-            <button onClick={() => setShowRight((v) => !v)} className={topButtonClass}>メモ {showRight ? "非表示" : "表示"}</button>
             <button onClick={downloadMd} className={topButtonClass}>MD保存</button>
-            <button onClick={copyMd} className={topButtonClass}>MDコピー</button>
-            <button onClick={saveToObsidian} className={topButtonClass}>Obsidian保存</button>
             <button onClick={createShare} className={topButtonClass}>QR表示</button>
             <button onClick={clearAll} className="rounded-lg border border-red-800 px-3 py-1.5 text-[11pt] text-red-400 hover:bg-red-950/40">クリア</button>
           </div>
