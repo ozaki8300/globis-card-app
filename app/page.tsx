@@ -1498,14 +1498,18 @@ export default function Home() {
     window.setTimeout(() => setCopyStatus(""), 1800);
   };
 
-  const saveToObsidian = () => {
+  const saveToObsidian = async () => {
     const md = buildObsidianMarkdown(raw, addedCards, memo, output, starred);
     const timestamp = getTimestampSlug();
     const fileTitle = getObsidianTitle(title, timestamp);
     const filePath = `ThoughtDeck/${fileTitle}`;
-    const url = `obsidian://new?file=${encodeURIComponent(filePath)}&content=${encodeURIComponent(md)}&append=true`;
-    setObsidianToast(`Obsidianに保存しました：${fileTitle}`);
-    window.setTimeout(() => setObsidianToast(""), 2200);
+    const url = `obsidian://new?file=${encodeURIComponent(filePath)}&clipboard=true&append=true`;
+
+    // 長いMarkdown本文をURIに直接詰めると、ブラウザやOSのURI長制限でObsidianが起動しないことがある。
+    // 本文はクリップボードに置き、Obsidian URIの clipboard=true で取り込ませる。
+    await copyTextSafely(md);
+    setObsidianToast(`Obsidianに保存します：${fileTitle}`);
+    window.setTimeout(() => setObsidianToast(""), 2600);
     window.location.href = url;
   };
 
