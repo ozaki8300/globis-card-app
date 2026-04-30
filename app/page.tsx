@@ -917,6 +917,7 @@ export default function Home() {
   const [showTemplatePanel, setShowTemplatePanel] = useState(false);
   const [openTopMenu, setOpenTopMenu] = useState<"more" | "display" | "export" | "resources" | "theme" | null>(null);
   const topMenuRef = useRef<HTMLDivElement | null>(null);
+  const memoRef = useRef<HTMLElement | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>("dark");
   const [customLinks, setCustomLinks] = useState<{ label: string; url: string }[]>([]);
   const [customLinkLabel, setCustomLinkLabel] = useState("");
@@ -1014,6 +1015,29 @@ export default function Home() {
   const isMobileLike = () => {
     if (typeof window === "undefined") return false;
     return window.innerWidth < 768 || window.matchMedia?.("(pointer: coarse)").matches;
+  };
+
+  const toggleMemoAndScroll = () => {
+    const isMobile = isMobileLike();
+
+    if (showRight) {
+      setShowRight(false);
+      if (selectedCardId === "td-memo") setSelectedCardId(null);
+      return;
+    }
+
+    setShowRight(true);
+    setSelectedCardId("td-memo");
+    setFocusMode(false);
+
+    if (!isMobile) return;
+
+    window.setTimeout(() => {
+      memoRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 120);
   };
 
   const handleResourceLinkClick = async (event: ReactMouseEvent<HTMLAnchorElement>, url: string) => {
@@ -1740,14 +1764,26 @@ export default function Home() {
         className="hidden shrink-0 overflow-hidden border-[var(--td-border)] bg-[var(--td-panel)] lg:flex lg:w-[var(--pdf-width)] lg:flex-col"
         style={{ "--pdf-width": `${pdfWidth}px` } as CSSProperties}
       >
-        <div className="flex min-h-[58px] items-center justify-between gap-2 border-b border-[var(--td-border)] px-3 py-2">
-          <div className="min-w-0">
+        <div className="flex min-h-[52px] items-center gap-2 overflow-x-auto border-b border-[var(--td-border)] px-3 py-2">
+          <div className="min-w-[160px] flex-1">
             <p className="truncate text-[10.5pt] font-bold text-[var(--td-text)]">
               PDF
               {pdfFileName ? <span className="ml-2 font-normal text-[var(--td-muted)]">{pdfFileName}</span> : null}
             </p>
-            <p className="text-[9.5pt] text-[var(--td-muted)]">PDF本体は保存しません</p>
+            <p className="text-[9pt] text-[var(--td-muted)]">PDF本体は保存しません</p>
           </div>
+
+          <label className="flex shrink-0 items-center gap-2 text-[10pt] text-[var(--td-muted)]">
+            ページ
+            <input
+              type="number"
+              min={1}
+              value={pdfPage}
+              onChange={(event) => setPdfPage(Math.max(1, Number(event.target.value) || 1))}
+              className="w-16 rounded-lg border border-[var(--td-border)] bg-[var(--td-editor)] px-2 py-1 text-[10pt] text-[var(--td-text)] outline-none focus:border-[var(--td-accent-border)]"
+            />
+          </label>
+
           <div className="flex shrink-0 items-center gap-1">
             <button
               onClick={() => setPdfSide("left")}
@@ -1766,26 +1802,11 @@ export default function Home() {
             <button onClick={hidePdf} className={panelButtonClass}>
               非表示
             </button>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-2 border-b border-[var(--td-border)] px-3 py-2">
-          <label className="flex items-center gap-2 text-[10.5pt] text-[var(--td-muted)]">
-            ページ
-            <input
-              type="number"
-              min={1}
-              value={pdfPage}
-              onChange={(event) => setPdfPage(Math.max(1, Number(event.target.value) || 1))}
-              className="w-20 rounded-lg border border-[var(--td-border)] bg-[var(--td-editor)] px-2 py-1 text-[10.5pt] text-[var(--td-text)] outline-none focus:border-[var(--td-accent-border)]"
-            />
-          </label>
-          <div className="flex items-center gap-1">
             <button onClick={openPdfPicker} className={panelButtonClass}>
-              PDF変更
+              変更
             </button>
             <button onClick={clearPdf} className={panelButtonClass}>
-              PDF解除
+              解除
             </button>
           </div>
         </div>
@@ -2664,6 +2685,7 @@ export default function Home() {
                   ▶
                 </button>
                 <aside
+                  ref={memoRef}
                   className="no-scrollbar w-full shrink-0 overflow-auto border-l border-[var(--td-border)] p-5 max-lg:border-l-0 max-lg:border-t lg:w-[var(--right-width)]"
                   style={{ "--right-width": `${rightWidth}px` } as CSSProperties}
                 >
@@ -2705,9 +2727,9 @@ export default function Home() {
           </button>
 
           <button
-            onClick={() => setShowRight((v) => !v)}
+            onClick={toggleMemoAndScroll}
             className={`${topButtonClass} flex-1 ${showRight ? "border-[var(--td-accent-border)] bg-[var(--td-accent-bg)] text-[var(--td-accent)]" : ""}`}
-            title="メモ欄を表示／非表示"
+            title={showRight ? "メモ欄を閉じる" : "メモ欄までスクロール"}
           >
             {showRight ? "▼ メモ" : "▶ メモ"}
           </button>
